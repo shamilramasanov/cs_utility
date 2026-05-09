@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import postgres from 'postgres'
 
 /** Ключи JSON-контента редактора (одна строка на ключ в `editor_content`). */
@@ -10,16 +11,20 @@ export const EDITOR_KEYS = {
 
 export type EditorContentKey = (typeof EDITOR_KEYS)[keyof typeof EDITOR_KEYS]
 
-/** Чтение env без литерала `process.env.FOO` — иначе Turbopack/Webpack на Vercel иногда «запекают» пустое значение на билде. */
+/** Имя переменной окружения без цельной строки в исходнике — иначе Turbopack на билде подставляет пусто. */
+function envNameFromB64(b64: string): string {
+  return Buffer.from(b64, 'base64').toString('utf8')
+}
+
 function readEnv(name: string): string | undefined {
   const v = process.env[name]
   return typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined
 }
 
 function connectionString(): string | null {
-  const pub = readEnv('DATABASE' + '_PUBLIC' + '_URL')
+  const pub = readEnv(envNameFromB64('REFUQUJBU0VfUFVCTElDX1VSTA=='))
   if (pub) return pub
-  return readEnv('DATABASE' + '_URL') ?? readEnv('POSTGRES' + '_URL') ?? null
+  return readEnv(envNameFromB64('REFUQUJBU0VfVVJM')) ?? readEnv(envNameFromB64('UE9TVEdSRVNfVVJM')) ?? null
 }
 
 let sqlSingleton: ReturnType<typeof postgres> | null = null
