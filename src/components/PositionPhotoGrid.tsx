@@ -9,6 +9,7 @@ import { countGrenadesForPosition, pickPositionCardLineupPhoto } from '@/lib/pos
 import { getMap } from '@/lib/grenades'
 import { pickLocalizedLabel, positionMatchesSearch } from '@/lib/i18n-helpers'
 import { usePositionOverrides } from '@/lib/usePositionOverrides'
+import { SearchInputLeadingIcon } from '@/components/SearchInputLeadingIcon'
 
 interface Props {
   positions: MapPosition[]
@@ -74,9 +75,7 @@ export default function PositionPhotoGrid({ positions, grenades, positionCatalog
             autoComplete="off"
             spellCheck={false}
           />
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#666]" aria-hidden>
-            🔍
-          </span>
+          <SearchInputLeadingIcon />
           {query && (
             <button
               type="button"

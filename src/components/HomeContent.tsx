@@ -23,11 +23,12 @@ import {
 } from '@/lib/i18n-helpers'
 import { usePositionOverrides } from '@/lib/usePositionOverrides'
 import { PositionPhotoCard } from '@/components/PositionPhotoGrid'
+import { APP_SEARCH_ICON_SRC, SearchInputLeadingIcon } from '@/components/SearchInputLeadingIcon'
 
 const TAB_COUNT = 4
 /** Иконки нижней навигации — `public/nav/*.png` */
 const NAV_ICON_SRC = [
-  '/nav/home-search.png',
+  APP_SEARCH_ICON_SRC,
   '/nav/home-maps.png',
   '/nav/home-tactics.png',
   '/nav/home-news.png',
@@ -224,21 +225,7 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
                 autoComplete="off"
                 spellCheck={false}
               />
-              <span
-                className="pointer-events-none absolute left-3 top-[calc(50%-3px)] -translate-y-1/2"
-                aria-hidden
-              >
-                <img
-                  src={NAV_ICON_SRC[0]}
-                  alt=""
-                  width={22}
-                  height={22}
-                  loading="eager"
-                  decoding="async"
-                  draggable={false}
-                  className="block h-[22px] w-[22px] object-contain opacity-70"
-                />
-              </span>
+              <SearchInputLeadingIcon />
             </div>
             <p className="mb-3 text-[11px] leading-snug text-[#666]">
               {debouncedQuery ? t('home.globalSearch.resultsHint') : t('home.globalSearch.hint')}

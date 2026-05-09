@@ -7,6 +7,7 @@ import type { MapPosition, PositionCategory } from '@/types/positions'
 import { positions as STATIC_POSITIONS } from '@/data/positions'
 import { mergePositionCatalog } from '@/lib/position-catalog-merge'
 import { getAdminSecretFromBrowser } from '@/lib/admin-client'
+import { SearchInputLeadingIcon } from '@/components/SearchInputLeadingIcon'
 
 const CATEGORIES: Array<{ id: PositionCategory; label: string }> = [
   { id: 'spawn', label: 'Спавн' },
@@ -280,16 +281,19 @@ export default function AdminCatalogClient({ mapId, map }: Props) {
       )}
 
       <div className="mt-4">
-        <input
-          type="search"
-          enterKeyHint="search"
-          autoComplete="off"
-          spellCheck={false}
-          value={catalogQuery}
-          onChange={(e) => setCatalogQuery(e.target.value)}
-          placeholder="Поиск: id, название, алиасы, категория, сторона, parent_id…"
-          className="h-11 w-full rounded-2xl border border-[#2a2a2a] bg-[#141414] px-4 text-sm text-white placeholder:text-[#555] focus:border-[#F0B429]/50 focus:outline-none"
-        />
+        <div className="relative">
+          <SearchInputLeadingIcon />
+          <input
+            type="search"
+            enterKeyHint="search"
+            autoComplete="off"
+            spellCheck={false}
+            value={catalogQuery}
+            onChange={(e) => setCatalogQuery(e.target.value)}
+            placeholder="Поиск: id, название, алиасы, категория, сторона, parent_id…"
+            className="h-11 w-full rounded-2xl border border-[#2a2a2a] bg-[#141414] pl-10 pr-4 text-sm text-white placeholder:text-[#555] focus:border-[#F0B429]/50 focus:outline-none"
+          />
+        </div>
         {!loading && (
           <p className="mt-1.5 text-[11px] text-[#666]">
             {debouncedCatalogQuery.trim()
