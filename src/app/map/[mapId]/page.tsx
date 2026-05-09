@@ -1,0 +1,39 @@
+import { unstable_noStore as noStore } from 'next/cache'
+import { getMap } from '@/lib/grenades'
+import { getMergedGrenadesForMap } from '@/lib/lineups'
+import { notFound } from 'next/navigation'
+import MapPageClientNoSSR from './MapPageClientNoSSR'
+import { getMergedPositionCatalog } from '@/lib/position-catalog-runtime'
+import { mapPageQueryFromRecord } from '@/lib/map-page-initial-query'
+
+export const dynamic = 'force-dynamic'
+
+interface Props {
+  params: Promise<{ mapId: string }>
+  searchParams?: Promise<Record<string, string | string[] | undefined | null>>
+}
+
+export default async function MapPage({ params, searchParams }: Props) {
+  noStore()
+
+  const [{ mapId }, sp] = await Promise.all([
+    params,
+    searchParams ?? Promise.resolve({} as Record<string, string | string[] | undefined | null>),
+  ])
+  const map = getMap(mapId)
+  if (!map) notFound()
+
+  const initialGrenades = getMergedGrenadesForMap(mapId)
+  const positionCatalog = getMergedPositionCatalog()
+  const initialQuery = mapPageQueryFromRecord(sp)
+  return (
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col">
+      <MapPageClientNoSSR
+        mapId={mapId}
+        initialGrenades={initialGrenades}
+        positionCatalog={positionCatalog}
+        initialQuery={initialQuery}
+      />
+    </div>
+  )
+}

@@ -1,0 +1,38 @@
+{
+  "lineups": [
+    {
+      "id": "df2bbc58-5b20-4166-add1-5ff9e2ba69cf",
+      "map": "de_mirage",
+      "layer_file": "de_mirage_radar_psd.png",
+      "x": 0.501610305958132,
+      "y": 0.5062399355877617,
+      "type": "smoke",
+      "title": "Коннектор",
+      "description": "",
+      "video_url": "",
+      "gallery": [],
+      "throw_variants": [
+        {
+          "id": "40790917-c3e9-4226-bb78-879b6c26218d",
+          "label": "Позиция \"Мусорка\"",
+          "sx": 0.9138486312399355,
+          "sy": 0.32588566827697263,
+          "throw_type": "jump",
+          "video_url": "/uploads/grenades/53acdd85-64ff-4fd8-802b-b5da0d8192a9.webm",
+          "gallery": [
+            "/uploads/grenades/26dea7c8-3f7e-4e3e-b00a-3fdac97e61a9.jpg",
+            "/uploads/grenades/4f454368-aa1b-4b7e-ae78-584fe39629aa.jpg",
+            "/uploads/grenades/e33fd1b8-158f-410b-be2c-41dcb1cd9740.jpg",
+            "/uploads/grenades/bf84f8aa-3911-46c9-a44d-ba426536d25b.jpg"
+          ],
+          "description": ""
+        }
+      ],
+      "side": "T",
+      "position_ids": [
+        "t_spawn"
+      ]
+    }
+  ],
+  "hidden_seed_ids": []
+}

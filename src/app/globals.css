@@ -1,0 +1,157 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0d0d0d;
+  --surface: #1a1a1a;
+  --surface2: #242424;
+  --border: #2e2e2e;
+  --text: #ffffff;
+  --text-muted: #888888;
+  --accent: #F0B429;
+
+  --smoke: #4FC3F7;
+  --flash: #FFD54F;
+  --molotov: #FF7043;
+  --he: #EF5350;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Быстрый тап без ожидания double-tap zoom; снижает «мёртвые» кнопки на iOS. */
+button,
+a,
+[role="button"],
+[role="tab"],
+[role="option"] {
+  touch-action: manipulation;
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  height: 100%;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+  overscroll-behavior: none;
+}
+
+/* Не держим overflow:hidden на обоих — на iOS Safari это часто ломает hit-testing по кнопкам
+   при внутренних скроллерах; скролл остаётся внутри экранов (h-dvh + min-h-0). */
+body {
+  overflow-y: auto;
+}
+
+/* App Router: #__next нет; main оставляем на будущее */
+#__next, main {
+  height: 100%;
+}
+
+/* Bottom sheet drag handle */
+.sheet-handle {
+  width: 36px;
+  height: 4px;
+  background: #444;
+  border-radius: 2px;
+  margin: 0 auto 12px;
+}
+
+/* Scrollable area inside bottom sheet */
+.sheet-scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Map container — no user-select */
+.map-container {
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-x pan-y pinch-zoom;
+}
+
+/* Marker pulse animation */
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+.marker-pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  animation: pulse-ring 1.5s ease-out infinite;
+  background: currentColor;
+}
+
+/* Slide up animation for bottom sheet */
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.slide-up {
+  animation: slide-up 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Акцент на методе броска: мягкое зелёное мигание для мгновенного считывания. */
+@keyframes throw-method-attention {
+  0%, 100% {
+    border-color: rgba(34, 197, 94, 0.55);
+    color: #86efac;
+    box-shadow: 0 0 0 rgba(34, 197, 94, 0);
+  }
+  50% {
+    border-color: rgba(74, 222, 128, 0.95);
+    color: #bbf7d0;
+    box-shadow: 0 0 0.75rem rgba(34, 197, 94, 0.42);
+  }
+}
+
+.throw-method-attention {
+  animation: throw-method-attention 1.05s ease-in-out infinite;
+}
+
+/* Tab bar safe area */
+.tab-bar {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/**
+ * Единая шапка: только safe-area сверху + маленький люфт (без жёсткого 3rem,
+ * чтобы не дублировать отступ с системным статус-баром на телефонах).
+ * Горизонт — как px-4, но не уже safe-area на iPhone.
+ */
+@layer utilities {
+  /**
+   * viewport-fit=cover в layout даёт env(safe-area-inset-top) на iOS.
+   */
+  .pt-app-header {
+    padding-top: max(0.5rem, calc(env(safe-area-inset-top, 0px) + 0.375rem));
+  }
+  .px-app-screen {
+    padding-left: max(1rem, env(safe-area-inset-left, 0px));
+    padding-right: max(1rem, env(safe-area-inset-right, 0px));
+  }
+  /**
+   * Совпадает по высоте с блоком контента `<SiteHeader>` (pt-app-header + строка лого h-10 + pb-3 + border).
+   */
+  .top-below-site-header {
+    top: calc(
+      max(0.5rem, calc(env(safe-area-inset-top, 0px) + 0.375rem)) + 2.5rem + 0.75rem +
+        1px
+    );
+  }
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

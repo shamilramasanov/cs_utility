@@ -1,0 +1,3 @@
+Сюда складываем промежуточные JSON по позициям (callouts) для каждой карты.
+Шаблон файла: content/positions/de_<map>.json
+Когда позиции готовы — переносим в src/data/positions.ts.
