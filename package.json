@@ -8,12 +8,15 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "build:favicon": "node scripts/build-favicon.mjs"
+    "build:favicon": "node scripts/build-favicon.mjs",
+    "seed:editor-db": "node --env-file=.env scripts/seed-editor-content.mjs",
+    "db:schema": "node --env-file=.env scripts/apply-editor-schema.mjs"
   },
   "dependencies": {
     "@swc/helpers": "0.5.15",
     "@vercel/blob": "^2.3.3",
     "next": "16.2.2",
+    "postgres": "^3.4.9",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },

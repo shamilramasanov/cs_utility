@@ -18,9 +18,9 @@ export async function GET(req: NextRequest) {
   if (!mapId || !sideKey) {
     return NextResponse.json({ error: 'map and side are required' }, { status: 400 })
   }
-  const catalog = getMergedPositionCatalog()
+  const catalog = await getMergedPositionCatalog()
   const positions = getAllPositionsForMap(mapId, catalog)
-  const zones = sanitizeZones(getStoredZones(mapId, sideKey) ?? [], positions)
+  const zones = sanitizeZones((await getStoredZones(mapId, sideKey)) ?? [], positions)
   return NextResponse.json({ zones })
 }
 
@@ -39,9 +39,9 @@ export async function POST(req: NextRequest) {
     if (!body.map || !sideKey || !Array.isArray(body.zones)) {
       return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
     }
-    const positions = getAllPositionsForMap(body.map, getMergedPositionCatalog())
+    const positions = getAllPositionsForMap(body.map, await getMergedPositionCatalog())
     const zones = sanitizeZones(body.zones, positions)
-    setStoredZones(body.map, sideKey, zones)
+    await setStoredZones(body.map, sideKey, zones)
 
     revalidatePath('/')
     revalidatePath(`/map/${body.map}`)

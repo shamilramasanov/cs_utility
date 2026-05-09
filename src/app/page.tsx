@@ -6,16 +6,18 @@ import type { Grenade } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
-export default function HomePage() {
+export default async function HomePage() {
   const maps = getMaps()
-  const mapsWithCounts = maps.map((map) => ({
-    map,
-    grenadeCount: getMergedGrenadesForMapFirstLayer(map.id).length,
-  }))
-  const grenadesByMap: Record<string, Grenade[]> = Object.fromEntries(
-    maps.map((m) => [m.id, getMergedGrenadesForMap(m.id)] as const),
+  const mapsWithCounts = await Promise.all(
+    maps.map(async (map) => ({
+      map,
+      grenadeCount: (await getMergedGrenadesForMapFirstLayer(map.id)).length,
+    })),
   )
-  const positionCatalog = getMergedPositionCatalog()
+  const grenadesByMap: Record<string, Grenade[]> = Object.fromEntries(
+    await Promise.all(maps.map(async (m) => [m.id, await getMergedGrenadesForMap(m.id)] as const)),
+  )
+  const positionCatalog = await getMergedPositionCatalog()
 
   return (
     <HomeContentClient

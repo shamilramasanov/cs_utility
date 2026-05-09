@@ -12,9 +12,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'map and side are required' }, { status: 400 })
   }
 
-  const catalog = getMergedPositionCatalog()
+  const catalog = await getMergedPositionCatalog()
   const positions = getAllPositionsForMap(mapId, catalog)
-  const stored = getStoredZones(mapId, sideKey)
+  const stored = await getStoredZones(mapId, sideKey)
   const zones = pickZones(stored, positions, sideKey)
 
   return NextResponse.json({ zones })

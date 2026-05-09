@@ -14,7 +14,7 @@ import { getMaps } from '@/lib/grenades'
  * Никаких секретов внутри нет.
  */
 export async function GET() {
-  return NextResponse.json(readPositionOverridesFile())
+  return NextResponse.json(await readPositionOverridesFile())
 }
 
 interface PatchBody {
@@ -33,14 +33,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
     }
 
-    const cur = readPositionOverridesFile()
+    const cur = await readPositionOverridesFile()
     if (body.patch === null) {
       delete cur.overrides[body.id]
     } else {
       const prev = cur.overrides[body.id] ?? {}
       cur.overrides[body.id] = { ...prev, ...(body.patch ?? {}) }
     }
-    writePositionOverridesFile(cur)
+    await writePositionOverridesFile(cur)
 
     // Для пользовательских страниц с `force-dynamic` это no-op, но не помешает.
     revalidatePath('/')

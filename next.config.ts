@@ -2,6 +2,8 @@ import type { NextConfig } from 'next'
 import path from 'path'
 
 const nextConfig: NextConfig = {
+  /** Иначе драйвер может некорректно собираться в serverless-функции на Vercel. */
+  serverExternalPackages: ['postgres'],
   /**
    * Dev-сервер Next блокирует загрузку dev-ресурсов (HMR и т.п.) с “чужих” origin’ов.
    * На iOS при открытии по IP это проявляется как “кнопки жмутся, но ничего не происходит”,

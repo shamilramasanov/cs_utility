@@ -12,7 +12,7 @@ export default async function AdminMapPage({ params }: Props) {
   const map = getMap(mapId)
   if (!map) notFound()
 
-  const positionCatalog = getMergedPositionCatalog()
+  const positionCatalog = await getMergedPositionCatalog()
 
   return (
     <AdminMapClient

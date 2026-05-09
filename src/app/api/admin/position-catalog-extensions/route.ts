@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   const mapId = req.nextUrl.searchParams.get('map')
-  const file = readPositionCatalogExtensionsFile()
+  const file = await readPositionCatalogExtensionsFile()
   if (mapId) {
     return NextResponse.json({ positions: file.positions.filter((p) => p.map === mapId) })
   }
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
       if (p.map !== body.map) continue
       next.push({ ...p, id: p.id.trim(), map: p.map.trim() })
     }
-    setExtensionPositionsForMap(body.map, next)
+    await setExtensionPositionsForMap(body.map, next)
 
     revalidatePath('/')
     revalidatePath('/admin/catalog')
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
       revalidatePath(`/map/${m.id}`)
       revalidatePath(`/admin/${m.id}`)
     })
-    return NextResponse.json({ ok: true, positions: getExtensionPositionsForMap(body.map) })
+    return NextResponse.json({ ok: true, positions: await getExtensionPositionsForMap(body.map) })
   } catch (e) {
     console.error(e)
     return NextResponse.json(jsonFromAdminWriteCatch(e), { status: statusFromAdminWriteCatch(e) })
@@ -101,9 +101,9 @@ export async function DELETE(req: NextRequest) {
   if (!mapId || !id) {
     return NextResponse.json({ error: 'map and id are required' }, { status: 400 })
   }
-  const file = readPositionCatalogExtensionsFile()
+  const file = await readPositionCatalogExtensionsFile()
   const rest = file.positions.filter((p) => !(p.map === mapId && p.id === id))
-  writePositionCatalogExtensionsFile({ positions: rest })
+  await writePositionCatalogExtensionsFile({ positions: rest })
 
   revalidatePath('/')
   revalidatePath(`/admin/catalog/${mapId}`)

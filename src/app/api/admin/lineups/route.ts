@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
       { status: 401 }
     )
   }
-  return NextResponse.json(readCustomLineupsFile())
+  return NextResponse.json(await readCustomLineupsFile())
 }
 
 export async function POST(req: NextRequest) {
@@ -26,14 +26,14 @@ export async function POST(req: NextRequest) {
     if (!isAdminAuthorized(req, body.secret)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    const cur = readCustomLineupsFile()
+    const cur = await readCustomLineupsFile()
     const data: CustomLineupsFile = {
       lineups: Array.isArray(body.lineups) ? body.lineups : cur.lineups,
       hidden_seed_ids: Array.isArray(body.hidden_seed_ids)
         ? body.hidden_seed_ids
         : cur.hidden_seed_ids ?? [],
     }
-    writeCustomLineupsFile(data)
+    await writeCustomLineupsFile(data)
     revalidatePath('/')
     getMaps().forEach((m) => revalidatePath(`/map/${m.id}`))
     return NextResponse.json({ ok: true })

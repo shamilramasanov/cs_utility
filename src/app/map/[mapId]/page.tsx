@@ -23,8 +23,10 @@ export default async function MapPage({ params, searchParams }: Props) {
   const map = getMap(mapId)
   if (!map) notFound()
 
-  const initialGrenades = getMergedGrenadesForMap(mapId)
-  const positionCatalog = getMergedPositionCatalog()
+  const [initialGrenades, positionCatalog] = await Promise.all([
+    getMergedGrenadesForMap(mapId),
+    getMergedPositionCatalog(),
+  ])
   const initialQuery = mapPageQueryFromRecord(sp)
   return (
     <div className="flex h-full min-h-0 w-full flex-1 flex-col">

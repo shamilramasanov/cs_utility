@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import type { MapPosition } from '@/types/positions'
+import { EDITOR_KEYS, editorDbGetJson, editorDbSetJson, isEditorDatabaseEnabled } from '@/lib/editor-db'
 
 const DATA_REL = 'src/data/position-catalog-extensions.json'
 
@@ -12,7 +13,7 @@ export interface PositionCatalogExtensionsFile {
   positions: MapPosition[]
 }
 
-export function readPositionCatalogExtensionsFile(): PositionCatalogExtensionsFile {
+function readFromDisk(): PositionCatalogExtensionsFile {
   const p = getPath()
   if (!fs.existsSync(p)) return { positions: [] }
   try {
@@ -24,19 +25,47 @@ export function readPositionCatalogExtensionsFile(): PositionCatalogExtensionsFi
   }
 }
 
-export function writePositionCatalogExtensionsFile(data: PositionCatalogExtensionsFile): void {
+function writeToDisk(data: PositionCatalogExtensionsFile): void {
   const p = getPath()
   fs.mkdirSync(path.dirname(p), { recursive: true })
   fs.writeFileSync(p, JSON.stringify(data, null, 2), 'utf8')
 }
 
-export function getExtensionPositionsForMap(mapId: string): MapPosition[] {
-  return readPositionCatalogExtensionsFile().positions.filter((p) => p.map === mapId)
+function normalize(raw: unknown): PositionCatalogExtensionsFile {
+  if (!raw || typeof raw !== 'object') return { positions: [] }
+  const data = raw as PositionCatalogExtensionsFile
+  return { positions: Array.isArray(data.positions) ? data.positions : [] }
+}
+
+export async function readPositionCatalogExtensionsFile(): Promise<PositionCatalogExtensionsFile> {
+  if (isEditorDatabaseEnabled()) {
+    const row = await editorDbGetJson(EDITOR_KEYS.position_catalog_extensions)
+    if (row != null) return normalize(row)
+  }
+  return readFromDisk()
+}
+
+export async function writePositionCatalogExtensionsFile(
+  data: PositionCatalogExtensionsFile,
+): Promise<void> {
+  if (isEditorDatabaseEnabled()) {
+    await editorDbSetJson(EDITOR_KEYS.position_catalog_extensions, data)
+    return
+  }
+  writeToDisk(data)
+}
+
+export async function getExtensionPositionsForMap(mapId: string): Promise<MapPosition[]> {
+  const file = await readPositionCatalogExtensionsFile()
+  return file.positions.filter((p) => p.map === mapId)
 }
 
 /** Полностью заменяет расширения для карты (остальные карты не трогаем). */
-export function setExtensionPositionsForMap(mapId: string, positions: MapPosition[]): void {
-  const file = readPositionCatalogExtensionsFile()
+export async function setExtensionPositionsForMap(
+  mapId: string,
+  positions: MapPosition[],
+): Promise<void> {
+  const file = await readPositionCatalogExtensionsFile()
   const rest = file.positions.filter((p) => p.map !== mapId)
-  writePositionCatalogExtensionsFile({ positions: [...rest, ...positions] })
+  await writePositionCatalogExtensionsFile({ positions: [...rest, ...positions] })
 }
