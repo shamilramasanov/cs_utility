@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { getAdminSecretFromBrowser } from '@/lib/admin-client'
+import { uploadGrenadeMedia } from '@/lib/admin-upload-browser'
 
 const BTN =
   'min-h-[56px] py-4 px-4 rounded-2xl text-base font-semibold touch-manipulation active:scale-[0.98] transition-transform disabled:opacity-50'
@@ -49,21 +49,12 @@ export default function MediaFields({
     setErr('')
     setBusy(kind)
     try {
-      const fd = new FormData()
-      fd.append('file', file)
-      const sec = getAdminSecretFromBrowser()
-      const r = await fetch('/api/admin/upload', {
-        method: 'POST',
-        headers: sec ? { 'x-admin-secret': sec } : {},
-        body: fd,
-      })
-      const j = (await r.json()) as { url?: string; error?: string }
-      if (!r.ok || !j.url) throw new Error(j.error ?? 'Ошибка')
+      const url = await uploadGrenadeMedia(file)
       if (kind === 'video') {
-        onVideoUrlChange(j.url)
+        onVideoUrlChange(url)
       } else {
         const lines = parseGalleryLines(galleryText)
-        lines.push(j.url)
+        lines.push(url)
         onGalleryTextChange(lines.join('\n'))
       }
     } catch (e) {
@@ -200,18 +191,9 @@ export default function MediaFields({
               setErr('')
               setBusy('image')
               try {
-                const fd = new FormData()
-                fd.append('file', f)
-                const sec = getAdminSecretFromBrowser()
-                const r = await fetch('/api/admin/upload', {
-                  method: 'POST',
-                  headers: sec ? { 'x-admin-secret': sec } : {},
-                  body: fd,
-                })
-                const j = (await r.json()) as { url?: string; error?: string }
-                if (!r.ok || !j.url) throw new Error(j.error ?? 'Ошибка')
+                const url = await uploadGrenadeMedia(f)
                 const lines = parseGalleryLines(acc)
-                lines.push(j.url)
+                lines.push(url)
                 acc = lines.join('\n')
                 onGalleryTextChange(acc)
               } catch (e) {

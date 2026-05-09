@@ -15,6 +15,7 @@ import type { MapPosition } from '@/types/positions'
 import { radarImageObjectPosition, useRadarImageBox } from '@/hooks/useRadarImageBox'
 import { GRENADE_COLORS, GRENADE_EMOJIS } from '@/lib/grenades'
 import { getAdminSecretFromBrowser } from '@/lib/admin-client'
+import { uploadGrenadeMedia } from '@/lib/admin-upload-browser'
 import MediaFields from '@/components/admin/MediaFields'
 import AdminChangelogLink from '@/components/admin/AdminChangelogLink'
 import { bumpLineupsVersionInBrowser } from '@/lib/lineups-sync'
@@ -1679,15 +1680,7 @@ function TargetPositionPhotoCard({
       setErr('')
       try {
         const sec = getAdminSecretFromBrowser()
-        const fd = new FormData()
-        fd.append('file', file)
-        const up = await fetch('/api/admin/upload', {
-          method: 'POST',
-          headers: sec ? { 'x-admin-secret': sec } : undefined,
-          body: fd,
-        })
-        if (!up.ok) throw new Error('upload failed')
-        const upJson = (await up.json()) as { url: string }
+        const screenshotUrl = await uploadGrenadeMedia(file)
         const patch = await fetch('/api/admin/position-overrides', {
           method: 'POST',
           headers: {
@@ -1697,7 +1690,7 @@ function TargetPositionPhotoCard({
           body: JSON.stringify({
             id: positionId,
             patch: {
-              screenshot_url: upJson.url,
+              screenshot_url: screenshotUrl,
               // Новый файл = сбрасываем старое кадрирование, чтобы не получить
               // случайный кроп от предыдущей картинки.
               screenshot_position: 'center',
