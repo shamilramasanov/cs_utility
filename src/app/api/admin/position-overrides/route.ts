@@ -6,6 +6,7 @@ import {
 } from '@/lib/position-overrides'
 import type { PositionOverride } from '@/types/positions'
 import { isAdminAuthorized } from '@/lib/admin-auth'
+import { jsonFromAdminWriteCatch, statusFromAdminWriteCatch } from '@/lib/admin-api-write-error'
 import { getMaps } from '@/lib/grenades'
 
 /**
@@ -48,6 +49,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, overrides: cur.overrides })
   } catch (e) {
     console.error(e)
-    return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+    return NextResponse.json(jsonFromAdminWriteCatch(e), { status: statusFromAdminWriteCatch(e) })
   }
 }

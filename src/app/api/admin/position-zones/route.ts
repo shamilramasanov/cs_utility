@@ -7,6 +7,7 @@ import { getMergedPositionCatalog } from '@/lib/position-catalog-runtime'
 import { sanitizeZones } from '@/lib/position-zones'
 import { getStoredZones, setStoredZones } from '@/lib/position-zones-store'
 import type { PositionZone } from '@/types/positions'
+import { jsonFromAdminWriteCatch, statusFromAdminWriteCatch } from '@/lib/admin-api-write-error'
 
 export async function GET(req: NextRequest) {
   if (!isAdminReadAuthorized(req)) {
@@ -46,8 +47,9 @@ export async function POST(req: NextRequest) {
     revalidatePath(`/map/${body.map}`)
     revalidatePath(`/admin/${body.map}`)
     return NextResponse.json({ ok: true, zones })
-  } catch {
-    return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  } catch (e) {
+    console.error(e)
+    return NextResponse.json(jsonFromAdminWriteCatch(e), { status: statusFromAdminWriteCatch(e) })
   }
 }
 

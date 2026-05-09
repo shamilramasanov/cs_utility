@@ -4,6 +4,7 @@ import { readCustomLineupsFile, writeCustomLineupsFile } from '@/lib/lineups'
 import { getMaps } from '@/lib/grenades'
 import type { CustomLineup, CustomLineupsFile } from '@/types'
 import { isAdminAuthorized, isAdminReadAuthorized } from '@/lib/admin-auth'
+import { jsonFromAdminWriteCatch, statusFromAdminWriteCatch } from '@/lib/admin-api-write-error'
 
 export async function GET(req: NextRequest) {
   if (!isAdminReadAuthorized(req)) {
@@ -38,6 +39,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error(e)
-    return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+    return NextResponse.json(jsonFromAdminWriteCatch(e), { status: statusFromAdminWriteCatch(e) })
   }
 }

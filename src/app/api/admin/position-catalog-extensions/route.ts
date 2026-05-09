@@ -9,6 +9,7 @@ import {
   setExtensionPositionsForMap,
   writePositionCatalogExtensionsFile,
 } from '@/lib/position-catalog-extensions-store'
+import { jsonFromAdminWriteCatch, statusFromAdminWriteCatch } from '@/lib/admin-api-write-error'
 
 const CATEGORIES: PositionCategory[] = [
   'spawn',
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, positions: getExtensionPositionsForMap(body.map) })
   } catch (e) {
     console.error(e)
-    return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+    return NextResponse.json(jsonFromAdminWriteCatch(e), { status: statusFromAdminWriteCatch(e) })
   }
 }
 
