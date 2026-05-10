@@ -261,6 +261,12 @@ export default function PositionSelector({
     return mergeGrenadesByDestination(g)
   }, [grenades, currentLayer.file, pickerTeam, nadeFilter])
 
+  /** Смена T/CT/все или типа гранаты — сбрасываем выбор, если он больше не в списке (иначе «висят» маркеры чужой стороны). */
+  useEffect(() => {
+    setSelectedGrenade((prev) => (prev && mapGrenades.some((x) => x.id === prev.id) ? prev : null))
+    setMapPreviewGrenade((prev) => (prev && mapGrenades.some((x) => x.id === prev.id) ? prev : null))
+  }, [mapGrenades])
+
   useEffect(() => {
     setMapPreviewGrenade((g) => {
       if (!g) return null

@@ -570,6 +570,12 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
     return destinationGrenades.filter((g) => g.type === activeFilter)
   }, [destinationGrenades, activeFilter])
 
+  /** Смена фильтра типа гранаты: убрать выбор с карты, если раскидка не попадает в текущий список. */
+  useEffect(() => {
+    setSelectedGrenade((g) => (g && filtered.some((x) => x.id === g.id) ? g : null))
+    setMapPreviewGrenade((g) => (g && filtered.some((x) => x.id === g.id) ? g : null))
+  }, [filtered])
+
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: destinationGrenades.length }
     destinationGrenades.forEach((g) => {
