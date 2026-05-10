@@ -837,9 +837,18 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
       {/* Основная зона: на md+ — карта в центре + панель сбоку,
           на мобильном — стек: панель сверху (или карта целиком). */}
       <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
-        {/* Левая панель: «Откуда бросаем?» / LineupGallery. На ПК — широкая колонка (до ~720px). */}
+        {/* Левая панель: «Откуда бросаем?» / LineupGallery.
+            На ПК в режиме `inThrowOriginMapStep` (нет subspots, ещё не выбрана раскидка)
+            — растягиваем на всю ширину, центральный блок с радаром скрываем
+            (временно: радар на десктопе тут не виден, а карточки полезнее в полную ширину). */}
         {showLineupGallery && !open && (
-          <div className="order-2 md:order-1 md:min-w-[400px] md:w-[min(46vw,720px)] md:max-w-[720px] md:shrink-0 md:border-r-0 md:flex md:flex-col">
+          <div
+            className={
+              inThrowOriginMapStep
+                ? 'order-2 md:order-1 md:flex md:min-w-0 md:flex-1 md:flex-col'
+                : 'order-2 md:order-1 md:min-w-[400px] md:w-[min(46vw,720px)] md:max-w-[720px] md:shrink-0 md:border-r-0 md:flex md:flex-col'
+            }
+          >
             <div className="hidden md:flex flex-1 min-h-0">
               {selectedSubspot ? (
                 <LineupGallery
@@ -875,9 +884,12 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
         )}
 
         {/* Центральная зона: карта или фото цели; на мобиле под картой — карточки «откуда бросаем».
-            z-20: фикс. шапка ThrowOriginGallery (z-41) в соседней колонке не перекрывает тулбар карты (+/−, название). */}
+            z-20: фикс. шапка ThrowOriginGallery (z-41) в соседней колонке не перекрывает тулбар карты (+/−, название).
+            На ПК в `inThrowOriginMapStep` колонку прячем — её место занимают карточки слева. */}
         <div
-          className="relative z-20 order-1 md:order-2 flex min-h-0 flex-1 flex-col overflow-hidden transition-all duration-300"
+          className={`relative z-20 order-1 md:order-2 flex min-h-0 flex-1 flex-col overflow-hidden transition-all duration-300 ${
+            inThrowOriginMapStep ? 'md:hidden' : ''
+          }`}
           suppressHydrationWarning
         >
           <div

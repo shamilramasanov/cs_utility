@@ -223,7 +223,14 @@ export default function ThrowOriginGallery({
             {items.length === 0 ? (
               <p className="pt-6 text-center text-sm text-[#666]">{t('throwOrigin.empty')}</p>
             ) : (
-              <ThrowOriginPositionCards items={items} selectedKey={selectedKey} onPick={onPick} gridClassName="px-0" />
+              <ThrowOriginPositionCards
+                items={items}
+                selectedKey={selectedKey}
+                onPick={onPick}
+                /** На ПК панель может быть и узкой (~720px), и во всю ширину окна
+                    — увеличиваем плотность сетки на больших ширинах. */
+                gridClassName="px-0 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
+              />
             )}
           </div>
         </div>
