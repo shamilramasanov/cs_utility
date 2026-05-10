@@ -13,7 +13,9 @@ import type {
 } from '@/types'
 import type { MapPosition } from '@/types/positions'
 import { radarImageObjectPosition, useRadarImageBox } from '@/hooks/useRadarImageBox'
-import { GRENADE_COLORS, GRENADE_EMOJIS } from '@/lib/grenades'
+import { GRENADE_COLORS } from '@/lib/grenades'
+import { throwOriginStrokeColor, throwOriginStrokeWidth } from '@/lib/map-marker-visual'
+import RadarLandMarker from '@/components/map/RadarLandMarker'
 import { getAdminSecretFromBrowser } from '@/lib/admin-client'
 import { uploadGrenadeMedia } from '@/lib/admin-upload-browser'
 import MediaFields from '@/components/admin/MediaFields'
@@ -930,6 +932,9 @@ export default function AdminMapClient({
                   if (!lSel?.throw_variants?.length) return null
                   const col = GRENADE_COLORS[lSel.type] ?? '#fff'
                   const activeVarId = radarPick?.kind === 'start' ? radarPick.variantId : null
+                  const strokeTeam = throwOriginStrokeColor(lSel.side)
+                  const sw = throwOriginStrokeWidth(lSel.side, 1 / zoom)
+                  const gt = lSel.type
                   return (
                     <svg className="absolute inset-0 w-full h-full overflow-visible pointer-events-none" style={{ zIndex: 20 }}>
                       {lSel.throw_variants.map((v) => (
@@ -945,18 +950,24 @@ export default function AdminMapClient({
                           opacity={activeVarId === v.id ? 0.9 : 0.5}
                         />
                       ))}
-                      {lSel.throw_variants.map((v) => (
-                        <circle
-                          key={`dot-${v.id}`}
-                          cx={`${v.sx * 100}%`}
-                          cy={`${v.sy * 100}%`}
-                          r={activeVarId === v.id ? 8 : 6}
-                          fill={col}
-                          stroke="#000"
-                          strokeWidth="1"
-                          opacity={activeVarId === v.id ? 1 : 0.7}
-                        />
-                      ))}
+                      {lSel.throw_variants.map((v) => {
+                        const baseR = activeVarId === v.id ? 9.5 : 7.5
+                        const rMul =
+                          gt === 'smoke' ? 1.08 : gt === 'flash' ? 0.82 : gt === 'molotov' ? 1.02 : 0.94
+                        const r = baseR * rMul
+                        return (
+                          <circle
+                            key={`dot-${v.id}`}
+                            cx={`${v.sx * 100}%`}
+                            cy={`${v.sy * 100}%`}
+                            r={r}
+                            fill={col}
+                            stroke={strokeTeam}
+                            strokeWidth={sw}
+                            opacity={activeVarId === v.id ? 1 : 0.78}
+                          />
+                        )
+                      })}
                     </svg>
                   )
                 })()}
@@ -965,27 +976,30 @@ export default function AdminMapClient({
                   const color = GRENADE_COLORS[l.type] ?? '#fff'
                   const sel = selectedKey === keyCustom(l.id)
                   return (
-                    <button
+                    <div
                       key={keyCustom(l.id)}
-                      type="button"
-                      data-marker="true"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setSelectedKey(keyCustom(l.id))
-                      }}
-                      title="Моя"
-                      className="absolute w-8 h-8 rounded-full flex items-center justify-center text-sm pointer-events-auto border-2 transition-transform active:scale-95 ring-2 ring-[#F0B429]/40"
+                      className="absolute pointer-events-auto"
                       style={{
                         left: `${l.x * 100}%`,
                         top: `${l.y * 100}%`,
-                        borderColor: color,
-                        background: sel ? color : `${color}55`,
+                        transform: 'translate(-50%, -50%)',
                         zIndex: sel ? 25 : 12,
-                        transform: `translate(-50%, -50%) scale(${sel ? 1.12 : 1})`,
                       }}
                     >
-                      {GRENADE_EMOJIS[l.type] ?? '●'}
-                    </button>
+                      <RadarLandMarker
+                        type={l.type}
+                        side={l.side}
+                        variant="custom"
+                        selected={sel}
+                        color={color}
+                        sizePx={28}
+                        title="Моя"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedKey(keyCustom(l.id))
+                        }}
+                      />
+                    </div>
                   )
                 })}
                 {renderedSeeds.map((g) => {
@@ -993,27 +1007,30 @@ export default function AdminMapClient({
                   const color = GRENADE_COLORS[g.type] ?? '#888'
                   const sel = selectedKey === keySeed(g.id)
                   return (
-                    <button
+                    <div
                       key={keySeed(g.id)}
-                      type="button"
-                      data-marker="true"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setSelectedKey(keySeed(g.id))
-                      }}
-                      title="База"
-                      className="absolute w-7 h-7 rounded-full flex items-center justify-center text-xs pointer-events-auto border-2 border-dashed transition-transform active:scale-95"
+                      className="absolute pointer-events-auto"
                       style={{
                         left: `${pos.x * 100}%`,
                         top: `${pos.y * 100}%`,
-                        borderColor: color,
-                        background: sel ? `${color}aa` : `${color}33`,
+                        transform: 'translate(-50%, -50%)',
                         zIndex: sel ? 24 : 11,
-                        transform: `translate(-50%, -50%) scale(${sel ? 1.12 : 1})`,
                       }}
                     >
-                      {GRENADE_EMOJIS[g.type] ?? '●'}
-                    </button>
+                      <RadarLandMarker
+                        type={g.type}
+                        side={g.side}
+                        variant="seed"
+                        selected={sel}
+                        color={color}
+                        sizePx={26}
+                        title="База"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedKey(keySeed(g.id))
+                        }}
+                      />
+                    </div>
                   )
                 })}
                 {/* Pulse ring: показывает куда кликнуть в режиме radarPick / addSecondStep */}

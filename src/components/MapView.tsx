@@ -3,6 +3,8 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
 import type { Grenade } from '@/types'
 import { GRENADE_COLORS } from '@/lib/grenades'
+import { throwOriginStrokeColor, throwOriginStrokeWidth } from '@/lib/map-marker-visual'
+import RadarLandMarker from '@/components/map/RadarLandMarker'
 import { radarImageObjectPosition, useRadarImageBox } from '@/hooks/useRadarImageBox'
 
 interface Props {
@@ -28,7 +30,8 @@ interface Props {
   mapTitle?: string
 }
 
-const MARKER_SIZE = 28
+/** Маркер приёма (куда падает утилита) — чуть компактнее, чем раньше. */
+const MARKER_SIZE = 24
 
 const MIN_ZOOM = 1
 const MAX_ZOOM = 4
@@ -427,20 +430,31 @@ export default function MapView({
                 previewGrenade?.id === g.id || selectedGrenade?.id === g.id
               const color = GRENADE_COLORS[g.type] ?? '#fff'
               return (
-                <GrenadeMarker
+                <div
                   key={g.id}
-                  grenade={g}
-                  x={pos.x}
-                  y={pos.y}
-                  color={color}
-                  isHighlighted={isHighlighted}
-                  isMuted={dimNonFocusedMarkers && !isHighlighted}
-                  inverseScale={invZoom}
-                  onClick={() => {
-                    onSelect(null)
-                    onPreviewChange(previewGrenade?.id === g.id ? null : g)
+                  className="pointer-events-none absolute"
+                  style={{
+                    left: `${pos.x * 100}%`,
+                    top: `${pos.y * 100}%`,
+                    transform: `translate(-50%, -50%) scale(${invZoom})`,
+                    zIndex: isHighlighted ? 30 : 10,
                   }}
-                />
+                >
+                  <RadarLandMarker
+                    type={g.type}
+                    side={g.side}
+                    variant="public"
+                    selected={isHighlighted}
+                    muted={dimNonFocusedMarkers && !isHighlighted}
+                    color={color}
+                    sizePx={MARKER_SIZE}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onSelect(null)
+                      onPreviewChange(previewGrenade?.id === g.id ? null : g)
+                    }}
+                  />
+                </div>
               )
             })}
 
@@ -464,6 +478,9 @@ export default function MapView({
                         origins.length - 1,
                       )
                     : -1
+                const strokeTeam = throwOriginStrokeColor(lineGrenade.side)
+                const sw = throwOriginStrokeWidth(lineGrenade.side, s)
+                const gt = lineGrenade.type
 
                 return (
                   <svg
@@ -486,24 +503,32 @@ export default function MapView({
                         style={{ pointerEvents: 'none' }}
                       />
                     ))}
-                    {origins.map(({ i, pos }) => (
-                      <circle
-                        key={`tr-or-${lineGrenade.id}-${i}`}
-                        data-throw-origin="true"
-                        cx={`${pos.x * 100}%`}
-                        cy={`${pos.y * 100}%`}
-                        r={(viSel === i ? 7 : 5) * s}
-                        fill={col}
-                        opacity={0.9}
-                        className="[-webkit-tap-highlight-color:transparent]"
-                        style={{ cursor: 'pointer', pointerEvents: 'auto' }}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onThrowVariantSelect(lineGrenade, i)
-                        }}
-                        onPointerDown={(e) => e.stopPropagation()}
-                      />
-                    ))}
+                    {origins.map(({ i, pos }) => {
+                      const baseR = (viSel === i ? 8.5 : 6.5) * s
+                      const rMul =
+                        gt === 'smoke' ? 1.08 : gt === 'flash' ? 0.82 : gt === 'molotov' ? 1.02 : 0.94
+                      const r = baseR * rMul
+                      return (
+                        <circle
+                          key={`tr-or-${lineGrenade.id}-${i}`}
+                          data-throw-origin="true"
+                          cx={`${pos.x * 100}%`}
+                          cy={`${pos.y * 100}%`}
+                          r={r}
+                          fill={col}
+                          stroke={strokeTeam}
+                          strokeWidth={sw}
+                          opacity={0.92}
+                          className="[-webkit-tap-highlight-color:transparent]"
+                          style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onThrowVariantSelect(lineGrenade, i)
+                          }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                        />
+                      )
+                    })}
                   </svg>
                 )
               })()}
@@ -532,80 +557,3 @@ export default function MapView({
   )
 }
 
-interface MarkerProps {
-  grenade: Grenade
-  x: number
-  y: number
-  color: string
-  isHighlighted: boolean
-  /** Когда выбрана зона, остальные маркеры приглушаем. */
-  isMuted: boolean
-  /** Компенсация масштаба карты: маркеры остаются одного размера на экране. */
-  inverseScale: number
-  onClick: () => void
-}
-
-const EMOJI: Record<string, string> = {
-  smoke: '💨',
-  flash: '⚡',
-  molotov: '🔥',
-  he: '💥',
-}
-
-function GrenadeMarker({
-  grenade,
-  x,
-  y,
-  color,
-  isHighlighted,
-  isMuted,
-  inverseScale,
-  onClick,
-}: MarkerProps) {
-  const mutedFill = '#2a2a2a'
-  const mutedBorder = '#6b7280'
-  return (
-    <div
-      className="pointer-events-none absolute"
-      style={{
-        left: `${x * 100}%`,
-        top: `${y * 100}%`,
-        transform: `translate(-50%, -50%) scale(${inverseScale})`,
-        zIndex: isHighlighted ? 30 : 10,
-      }}
-    >
-      <button
-        type="button"
-        data-marker="true"
-        onClick={(e) => {
-          e.stopPropagation()
-          onClick()
-        }}
-        className="pointer-events-auto transition-transform active:scale-90"
-        style={{
-          width: MARKER_SIZE,
-          height: MARKER_SIZE,
-        }}
-      >
-        <div
-          className="relative flex h-full w-full items-center justify-center rounded-full text-sm transition-all"
-          style={{
-            background: isMuted ? mutedFill : isHighlighted ? color : `${color}33`,
-            border: `2px solid ${isMuted ? mutedBorder : color}`,
-            boxShadow: isHighlighted ? `0 0 12px ${color}88` : 'none',
-            transform: isHighlighted ? 'scale(1.3)' : isMuted ? 'scale(0.94)' : 'scale(1)',
-            opacity: isMuted ? 0.72 : 1,
-            filter: isMuted ? 'grayscale(1)' : 'none',
-          }}
-        >
-          <span
-            className="block leading-none"
-            style={{ fontSize: 13, transform: 'translateY(-1px)' }}
-          >
-            {EMOJI[grenade.type] ?? '●'}
-          </span>
-        </div>
-      </button>
-    </div>
-  )
-}
