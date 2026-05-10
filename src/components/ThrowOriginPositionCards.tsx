@@ -22,7 +22,9 @@ export default function ThrowOriginPositionCards({
 }: Props) {
   return (
     <div className={className}>
-      <ul className={`grid grid-cols-2 gap-2 pb-3 md:gap-3 md:pb-2 xl:grid-cols-3 ${gridClassName}`}>
+      <ul
+        className={`grid w-full max-w-full grid-cols-2 gap-2 pb-3 md:gap-3 md:pb-2 ${gridClassName}`}
+      >
         {items.map((item) => (
           <li key={item.key}>
             <button
@@ -39,7 +41,7 @@ export default function ThrowOriginPositionCards({
                   src={item.preview}
                   alt={item.title}
                   fill
-                  sizes="(max-width: 768px) 46vw, (max-width: 1280px) 28vw, 280px"
+                  sizes="(max-width: 768px) 46vw, min(720px, 46vw)"
                   className="object-cover"
                 />
               ) : (

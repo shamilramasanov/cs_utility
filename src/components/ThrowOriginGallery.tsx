@@ -217,9 +217,9 @@ export default function ThrowOriginGallery({
     <>
       <aside className="hidden h-full overflow-hidden md:flex md:flex-col md:border-r md:border-[#1f1f1f] md:bg-[#0d0d0d]">
         {headerSection}
-        <div className="flex min-h-0 flex-1 flex-col px-app-screen pb-2 pt-1 md:px-5 lg:px-6">
+        <div className="flex min-h-0 flex-1 flex-col px-app-screen pb-2 pt-1 md:px-3 lg:px-4">
           <p className="text-[11px] leading-relaxed text-[#8d8d8d]">{t('throwOrigin.externalMapHint')}</p>
-          <div className="min-h-0 flex-1 overflow-y-auto pt-2">
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pt-2">
             {items.length === 0 ? (
               <p className="pt-6 text-center text-sm text-[#666]">{t('throwOrigin.empty')}</p>
             ) : (
@@ -227,9 +227,8 @@ export default function ThrowOriginGallery({
                 items={items}
                 selectedKey={selectedKey}
                 onPick={onPick}
-                /** На ПК панель может быть и узкой (~720px), и во всю ширину окна
-                    — увеличиваем плотность сетки на больших ширинах. */
-                gridClassName="px-0 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
+                /** Одна колонка на md+ — каждая карточка на всю ширину панели просмотра. */
+                gridClassName="w-full max-w-full px-0 md:grid-cols-1 lg:grid-cols-1 xl:grid-cols-1 2xl:grid-cols-1"
               />
             )}
           </div>

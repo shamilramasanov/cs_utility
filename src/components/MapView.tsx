@@ -370,7 +370,7 @@ export default function MapView({
       </div>
 
       <div
-        className={`relative min-h-0 flex-1 overflow-hidden ${
+        className={`relative min-h-0 flex-1 overflow-hidden md:min-h-[min(48vh,600px)] ${
           imagePosition === 'top' ? 'pt-1 max-md:pt-1.5' : 'pt-1 max-md:pt-2'
         }`}
       >
