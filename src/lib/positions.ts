@@ -172,14 +172,27 @@ export function filterGrenadesByPosition(
   return grenades.filter((g) => belongsToPosition(g, pos, catalog))
 }
 
-/** Сколько раскидок относится к позиции — для бейджа в списке. */
+/** Сколько «способов сыграть» у гранаты: варианты броска или одна точка без вариантов. */
+function playableThrowVariantCount(g: Grenade): number {
+  const vars = g.throw_variants?.filter((v) => v?.start_pos) ?? []
+  if (vars.length > 0) return vars.length
+  return 1
+}
+
+/**
+ * Сколько раскидок относится к позиции — для бейджа в списке.
+ * Одна запись с несколькими `throw_variants` даёт несколько (как у коннектора с двумя бросками).
+ */
 export function countGrenadesForPosition(
   grenades: Grenade[],
   pos: MapPosition,
   catalog: PositionCatalog = STATIC_POSITIONS,
 ): number {
   let n = 0
-  for (const g of grenades) if (belongsToPosition(g, pos, catalog)) n++
+  for (const g of grenades) {
+    if (!belongsToPosition(g, pos, catalog)) continue
+    n += playableThrowVariantCount(g)
+  }
   return n
 }
 

@@ -1,11 +1,15 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Grenade } from '@/types'
 import { GRENADE_COLORS, GRENADE_LABELS, GRENADE_EMOJIS, DIFFICULTY_COLORS, DIFFICULTY_LABELS } from '@/lib/grenades'
 import { useT } from '@/i18n'
 import ThrowVariantOriginDock from './ThrowVariantOriginDock'
+import {
+  beginThrowVariantSwipeWindowTracking,
+  teardownThrowVariantSwipeWindow,
+} from '@/lib/throw-variant-swipe-window'
 
 interface Props {
   grenade: Grenade
@@ -131,6 +135,24 @@ export default function BottomSheet({
     setPortalReady(true)
   }, [])
 
+  useEffect(() => () => teardownThrowVariantSwipeWindow(), [])
+
+  const getMediaSwipeCtx = useCallback(
+    () => ({
+      count: variants.length,
+      activeIndex: vi,
+      onChange: onThrowVariantIndexChange!,
+    }),
+    [variants.length, vi, onThrowVariantIndexChange],
+  )
+
+  const onMediaBlockSwipeTouchStart = (e: React.TouchEvent) => {
+    if (!showVariantDock || !onThrowVariantIndexChange || variants.length < 2) return
+    if (e.touches.length !== 1) return
+    const tch = e.touches[0]
+    beginThrowVariantSwipeWindowTracking(tch.identifier, tch.clientX, tch.clientY, getMediaSwipeCtx)
+  }
+
   useEffect(() => {
     if (!showThrowGuide) return
     const onKey = (e: KeyboardEvent) => {
@@ -233,6 +255,10 @@ export default function BottomSheet({
           paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 0.5rem)',
         }}
       >
+        <div
+          className="flex min-h-0 min-w-0 flex-1 flex-col"
+          onTouchStart={onMediaBlockSwipeTouchStart}
+        >
         {/* Компактный ряд: тип, заголовок, бросок/позиция, закрыть */}
         <div className="relative flex shrink-0 items-start gap-2 border-b border-[#262626]/90 px-app-screen pb-2 pt-2">
           <div className="min-w-0 flex-1 space-y-1">
@@ -322,6 +348,7 @@ export default function BottomSheet({
             </div>
           )}
         </div>
+        </div>
 
         {showVariantDock && onThrowVariantIndexChange && (
           <ThrowVariantOriginDock
@@ -360,6 +387,10 @@ export default function BottomSheet({
           <div className="sheet-handle mx-auto" />
         </div>
 
+        <div
+          className="flex min-h-0 min-w-0 flex-1 flex-col"
+          onTouchStart={onMediaBlockSwipeTouchStart}
+        >
         <div className="relative flex shrink-0 items-start gap-2 border-b border-[#333]/80 px-5 pb-2 pt-1">
           <div className="min-w-0 flex-1 space-y-1">
             <div className="flex flex-wrap items-center justify-start gap-2 pt-2 pl-0.5">
@@ -457,6 +488,7 @@ export default function BottomSheet({
               <div className="text-[#333] text-xs">Добавь в админке</div>
             </div>
           )}
+        </div>
         </div>
 
         {showVariantDock && onThrowVariantIndexChange && (

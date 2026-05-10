@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useT } from '@/i18n'
+import {
+  beginThrowVariantSwipeWindowTracking,
+  teardownThrowVariantSwipeWindow,
+  tryThrowVariantSwipeNavigate,
+} from '@/lib/throw-variant-swipe-window'
 
 interface Props {
   count: number
@@ -18,15 +23,6 @@ interface Props {
    */
   overlay?: boolean
   overlayPositionClass?: string
-}
-
-const SWIPE_MIN = 36
-
-function isDominantHorizontal(dx: number, dy: number): boolean {
-  const ax = Math.abs(dx)
-  const ay = Math.abs(dy)
-  if (ax < SWIPE_MIN) return false
-  return ax >= ay * 1.08
 }
 
 /**
@@ -57,22 +53,21 @@ export default function ThrowVariantOriginDock({
 
   const clamped = Math.max(0, Math.min(count - 1, activeIndex))
 
-  const trySwipeNavigate = useCallback(
-    (dx: number, dy: number): boolean => {
-      if (count < 2 || !isDominantHorizontal(dx, dy)) return false
-      if (dx < 0 && clamped < count - 1) {
+  const swipeCtx = useCallback(
+    () => ({
+      count,
+      activeIndex: clamped,
+      onChange,
+      markSkipNextClick: () => {
         skipNextClickRef.current = true
-        onChange(clamped + 1)
-        return true
-      }
-      if (dx > 0 && clamped > 0) {
-        skipNextClickRef.current = true
-        onChange(clamped - 1)
-        return true
-      }
-      return false
-    },
+      },
+    }),
     [clamped, count, onChange],
+  )
+
+  const trySwipeNavigate = useCallback(
+    (dx: number, dy: number): boolean => tryThrowVariantSwipeNavigate(swipeCtx(), dx, dy),
+    [swipeCtx],
   )
 
   const scrollActiveIntoView = useCallback(() => {
@@ -90,6 +85,7 @@ export default function ThrowVariantOriginDock({
     () => () => {
       windowCleanupRef.current?.()
       windowCleanupRef.current = null
+      teardownThrowVariantSwipeWindow()
       if (mouseUpHandlerRef.current) {
         window.removeEventListener('mouseup', mouseUpHandlerRef.current)
         mouseUpHandlerRef.current = null
@@ -98,58 +94,12 @@ export default function ThrowVariantOriginDock({
     [],
   )
 
-  const teardownWindowTouches = useCallback(() => {
-    windowCleanupRef.current?.()
-    windowCleanupRef.current = null
-  }, [])
-
   const beginWindowTouchSwipe = useCallback(
     (touchId: number, x0: number, y0: number) => {
-      teardownWindowTouches()
-
-      let lastX = x0
-      let lastY = y0
-
-      const onMove = (ev: TouchEvent) => {
-        for (let i = 0; i < ev.touches.length; i++) {
-          const tch = ev.touches[i]
-          if (tch.identifier === touchId) {
-            lastX = tch.clientX
-            lastY = tch.clientY
-            break
-          }
-        }
-      }
-
-      const onEnd = (ev: TouchEvent) => {
-        for (let i = 0; i < ev.changedTouches.length; i++) {
-          const c = ev.changedTouches[i]
-          if (c.identifier !== touchId) continue
-          teardownWindowTouches()
-          const dx = c.clientX - x0
-          const dy = c.clientY - y0
-          trySwipeNavigate(dx, dy)
-          return
-        }
-        teardownWindowTouches()
-        trySwipeNavigate(lastX - x0, lastY - y0)
-      }
-
-      const onCancel = () => {
-        teardownWindowTouches()
-      }
-
-      window.addEventListener('touchmove', onMove as EventListener, { passive: true })
-      window.addEventListener('touchend', onEnd as EventListener, { passive: true })
-      window.addEventListener('touchcancel', onCancel, { passive: true })
-
-      windowCleanupRef.current = () => {
-        window.removeEventListener('touchmove', onMove as EventListener)
-        window.removeEventListener('touchend', onEnd as EventListener)
-        window.removeEventListener('touchcancel', onCancel)
-      }
+      windowCleanupRef.current?.()
+      windowCleanupRef.current = beginThrowVariantSwipeWindowTracking(touchId, x0, y0, swipeCtx)
     },
-    [teardownWindowTouches, trySwipeNavigate],
+    [swipeCtx],
   )
 
   /** Старт жеста на плашке: вешаем window, не блокируя клики по кнопкам */

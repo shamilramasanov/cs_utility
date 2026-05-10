@@ -180,8 +180,21 @@ export default function AdminCatalogClient({ mapId, map }: Props) {
     return true
   }
 
-  const removeExtensionEntry = async (id: string) => {
-    const next = extensions.filter((p) => !(p.map === mapId && p.id === id))
+  const confirmAndRemoveCatalogExtensions = async (row: MapPosition) => {
+    const idsToRemove = collectExtensionIdsToRemove(extensions, mapId, row)
+    const count = idsToRemove.length
+    const isSub = Boolean(row.parent_id)
+    let msg: string
+    if (isSub) {
+      msg = `Удалить sub-позицию «${row.id}» из каталога на сервере? Это действие нельзя отменить.`
+    } else if (count > 1) {
+      msg = `Удалить позицию «${row.id}» и ещё ${count - 1} вложенных sub из каталога (JSON/БД)? Это действие нельзя отменить.`
+    } else {
+      msg = `Полностью удалить позицию «${row.id}» из каталога на сервере? Для id из базы снова подтянется статика. Отменить нельзя.`
+    }
+    if (!window.confirm(msg)) return
+    if (editingId && idsToRemove.includes(editingId)) setEditingId(null)
+    const next = extensions.filter((p) => !(p.map === mapId && idsToRemove.includes(p.id)))
     await saveExtensions(next)
   }
 
@@ -226,8 +239,9 @@ export default function AdminCatalogClient({ mapId, map }: Props) {
       <h1 className="text-2xl font-bold">Каталог позиций</h1>
       <p className="mt-1 text-sm text-[#888]">
         База в коде + правки в{' '}
-        <code className="text-[#aaa]">src/data/position-catalog-extensions.json</code>. Запись с тем же id
-        заменяет позицию из бандла. Удали запись из JSON — снова подтянется статика.
+        <code className="text-[#aaa]">position_catalog_extensions</code> (файл или БД). Запись с тем же id
+        заменяет позицию из бандла. «Удалить из каталога» убирает запись с сервера; у корня вместе удаляются все
+        sub-позиции из JSON с этим <code className="text-[#aaa]">parent_id</code>.
       </p>
       {msg && <p className="mt-2 text-sm text-emerald-400/90">{msg}</p>}
 
@@ -355,10 +369,15 @@ export default function AdminCatalogClient({ mapId, map }: Props) {
                     {src !== 'static' && (
                       <button
                         type="button"
-                        onClick={() => removeExtensionEntry(p.id)}
-                        className="rounded-lg border border-red-500/40 bg-red-500/10 px-2 py-1 text-xs text-red-200"
+                        onClick={() => void confirmAndRemoveCatalogExtensions(p)}
+                        title={
+                          isSub
+                            ? 'Убрать эту sub-позицию из каталога на сервере'
+                            : 'Удалить эту позицию и все её sub из каталога (JSON/БД)'
+                        }
+                        className="rounded-lg border border-red-500/60 bg-red-950/50 px-2.5 py-1.5 text-xs font-semibold text-red-100 hover:bg-red-950/70"
                       >
-                        Убрать из JSON
+                        Удалить из каталога
                       </button>
                     )}
                     {src === 'static' && (
@@ -401,6 +420,35 @@ export default function AdminCatalogClient({ mapId, map }: Props) {
       )}
     </div>
   )
+}
+
+/**
+ * Id всех записей расширения для этой карты, которые нужно удалить: сама позиция и все потомки по parent_id.
+ */
+function collectExtensionIdsToRemove(
+  extensions: MapPosition[],
+  mapId: string,
+  row: MapPosition,
+): string[] {
+  const forMap = extensions.filter((p) => p.map === mapId)
+  const ids = new Set<string>()
+  if (row.parent_id) {
+    ids.add(row.id)
+    return [...ids]
+  }
+  ids.add(row.id)
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const p of forMap) {
+      if (ids.has(p.id)) continue
+      if (p.parent_id && ids.has(p.parent_id)) {
+        ids.add(p.id)
+        changed = true
+      }
+    }
+  }
+  return [...ids]
 }
 
 function pickSort(p: MapPosition): number {
