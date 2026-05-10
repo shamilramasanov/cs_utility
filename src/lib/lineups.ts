@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { unstable_cache } from 'next/cache'
 import type { CustomLineupsFile, Grenade } from '@/types'
 import grenadesData from '@/data/grenades.json'
 import { getMap } from '@/lib/grenades'
@@ -75,6 +76,13 @@ export async function getMergedGrenadesForMap(mapId: string): Promise<Grenade[]>
   )
   return [...customGrenades, ...base]
 }
+
+/** Для RSC страницы карты: кэш до 60 с, чтобы не читать диск/БД на каждый запрос. */
+export const getMergedGrenadesForMapCached = unstable_cache(
+  async (mapId: string) => getMergedGrenadesForMap(mapId),
+  ['merged-grenades'],
+  { revalidate: 60, tags: ['lineups', 'map-lineups'] },
+)
 
 /**
  * Точки на первом слое карты — как при открытии `/map/...` (активен слой 0).

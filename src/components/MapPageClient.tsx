@@ -176,8 +176,32 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
     () => (posIdFromUrl ? getPositionById(posIdFromUrl, positionCatalog) : undefined),
     [posIdFromUrl, positionCatalog],
   )
+  /**
+   * Локальные «зеркала» query-параметров `side` и `pnade`. Меняем их через
+   * `setState` + `window.history.replaceState`, минуя Next-роутер: страница
+   * `/map/[mapId]` помечена `force-dynamic`, и каждый `router.push/replace`
+   * заставлял сервер заново тащить грантаты + каталог + перерендеривать всё
+   * дерево, отчего фильтры лагали по 1–2 секунды.
+   *
+   * `useSearchParams()` остаётся источником правды при «настоящей» навигации
+   * (тапы по позиции, back/forward, переходы извне) — синхронизируем
+   * локальные state в effect ниже.
+   */
+  const [sideRaw, setSideRaw] = useState<string | null>(() => searchParams.get('side'))
+  const [pnadeRaw, setPnadeRaw] = useState<string | null>(() => searchParams.get('pnade'))
+
+  useEffect(() => {
+    const s = searchParams.get('side')
+    setSideRaw((prev) => (prev === s ? prev : s))
+  }, [searchParams])
+
+  useEffect(() => {
+    const p = searchParams.get('pnade')
+    setPnadeRaw((prev) => (prev === p ? prev : p))
+  }, [searchParams])
+
   const sideKey: SideKey = useMemo(() => {
-    const raw = searchParams.get('side')
+    const raw = sideRaw
     if (selectedPos) {
       const u = parseSideKey(raw)
       if (u) return u
@@ -185,16 +209,15 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
     }
     if (raw === 'any') return 't'
     return parseSideKey(raw) ?? 't'
-  }, [selectedPos, searchParams])
+  }, [selectedPos, sideRaw])
 
   const pickerTeam: SideKey | 'any' = useMemo(() => {
     if (selectedPos) return sideKey
-    const rawSide = searchParams.get('side')
-    if (rawSide === 'any') return 'any'
-    if (rawSide === 'ct' || rawSide === 't') return rawSide
+    if (sideRaw === 'any') return 'any'
+    if (sideRaw === 'ct' || sideRaw === 't') return sideRaw
     // Дефолт на экране выбора позиции: показываем обе стороны.
     return 'any'
-  }, [selectedPos, sideKey, searchParams])
+  }, [selectedPos, sideKey, sideRaw])
   const subspots = useMemo(
     () => (selectedPos ? getSubspotsForPosition(selectedPos.id, positionCatalog) : []),
     [selectedPos, positionCatalog],
@@ -216,10 +239,17 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
     return getPositionsByMapAndSide(mapId, pickerTeam, positionCatalog)
   }, [mapId, pickerTeam, positionCatalog])
 
+  /** Для эффекта зон: не тащить `positionsForPickerBase` в deps (новый [] каждый рендер → лишние fetch). */
+  const positionsForPickerBaseRef = useRef(positionsForPickerBase)
+  useLayoutEffect(() => {
+    positionsForPickerBaseRef.current = positionsForPickerBase
+  }, [positionsForPickerBase])
+  const zonesFetchSeqRef = useRef(0)
+
   const [activeFilter, setActiveFilter] = useState<string>('all')
   const pickerNadeFilter = useMemo(
-    () => parsePickerNadeParam(searchParams.get('pnade')),
-    [searchParams],
+    () => parsePickerNadeParam(pnadeRaw),
+    [pnadeRaw],
   )
   /** Запоминаем T / CT / все на экране выбора позиции, чтобы вернуть после `onPositionReset`. */
   const pickerSideSnapshotRef = useRef<PickerTeamFilter>('any')
@@ -303,20 +333,23 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
   }, [])
 
   useEffect(() => {
-    const fallback = getDefaultZonesForPositions(positionsForPickerBase)
+    const positions = positionsForPickerBaseRef.current
+    const fallback = getDefaultZonesForPositions(positions)
     setZones(fallback)
+    const seq = ++zonesFetchSeqRef.current
     const ctrl = new AbortController()
     const apiSide: SideKey = pickerTeam === 'any' ? 't' : pickerTeam
     fetch(`/api/position-zones?map=${mapId}&side=${apiSide}`, { signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((json) => {
+        if (seq !== zonesFetchSeqRef.current) return
         if (json && Array.isArray(json.zones) && json.zones.length > 0) {
           setZones(json.zones)
         }
       })
       .catch(() => {})
     return () => ctrl.abort()
-  }, [mapId, pickerTeam, positionsForPickerBase])
+  }, [mapId, pickerTeam])
 
   useEffect(() => {
     setMapPreviewGrenade((g) => {
@@ -344,27 +377,69 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
     setMapPreviewGrenade(null)
   }, [posIdFromUrl, sideKey, spotIdFromUrl])
 
+  /**
+   * Читаем актуальный query из `window.location.search` — мы можем обновлять
+   * URL «тихо» через `history.replaceState` (для side/pnade/tab), и в этих
+   * случаях `useSearchParams()` отстаёт. Для построения новых URL нужен
+   * самый свежий снимок.
+   */
+  const readCurrentSearchParams = useCallback((): URLSearchParams => {
+    if (typeof window === 'undefined') {
+      return new URLSearchParams(Array.from(searchParams.entries()))
+    }
+    return new URLSearchParams(window.location.search)
+  }, [searchParams])
+
   // ─── Навигация (push для истории) ──────────────────────────────────────────
   const navigate = useCallback(
     (mutate: (sp: URLSearchParams) => void, mode: 'push' | 'replace' = 'push') => {
-      const sp = new URLSearchParams(Array.from(searchParams.entries()))
+      const sp = readCurrentSearchParams()
       mutate(sp)
       const qs = sp.toString()
       const url = qs ? `${pathname}?${qs}` : pathname
       if (mode === 'push') router.push(url, { scroll: false })
       else router.replace(url, { scroll: false })
     },
-    [pathname, router, searchParams],
+    [pathname, router, readCurrentSearchParams],
+  )
+
+  /** Тихий апдейт query-параметра без триггера Next-роутера. */
+  const writeSearchParamSilently = useCallback(
+    (mutate: (sp: URLSearchParams) => void) => {
+      if (typeof window === 'undefined') return
+      const url = new URL(window.location.href)
+      mutate(url.searchParams)
+      const next = `${url.pathname}${url.search}${url.hash}`
+      const cur = `${window.location.pathname}${window.location.search}${window.location.hash}`
+      if (next === cur) return
+      window.history.replaceState(window.history.state, '', next)
+    },
+    [],
   )
 
   const setPickerNadeFilter = useCallback(
     (f: PickerNadeFilter) => {
-      navigate((sp) => {
+      setPnadeRaw(f === 'all' ? null : f)
+      writeSearchParamSilently((sp) => {
         if (f === 'all') sp.delete('pnade')
         else sp.set('pnade', f)
-      }, 'replace')
+      })
     },
-    [navigate],
+    [writeSearchParamSilently],
+  )
+
+  const setPickerTeam = useCallback(
+    (team: PickerTeamFilter) => {
+      setSideRaw(team)
+      writeSearchParamSilently((sp) => {
+        sp.set('side', team)
+        // Для consistency с прежним поведением (на picker-экране `pos`/`spot`
+        // не должны тащиться через смену стороны).
+        sp.delete('pos')
+        sp.delete('spot')
+      })
+    },
+    [writeSearchParamSilently],
   )
 
   const onPositionPick = useCallback(
@@ -452,6 +527,21 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
   const bySide = useMemo(() => {
     return onLayer.filter((g) => isSideMatch(g.side, sideKey))
   }, [onLayer, sideKey])
+
+  /**
+   * Раскидки T / CT на текущем слое — нужны для определения «куда вести» при
+   * клике на позицию `side='both'` и для всего, что считает раскидки на «сторону».
+   * Раньше это считалось inline в `pickPositionHref` для каждой позиции на каждом
+   * рендере; теперь — один раз через memo.
+   */
+  const onLayerByT = useMemo(
+    () => onLayer.filter((g) => isSideMatch(g.side, 't')),
+    [onLayer],
+  )
+  const onLayerByCT = useMemo(
+    () => onLayer.filter((g) => isSideMatch(g.side, 'ct')),
+    [onLayer],
+  )
 
   /** На экране выбора позиции подставляем раскидки обеих сторон при team=any. */
   const grenadesForPositionPicker = useMemo(() => {
@@ -630,10 +720,8 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
   if (!selectedPos) {
     const backQs = (() => {
       const sp = new URLSearchParams()
-      const s = searchParams.get('side')
-      if (s) sp.set('side', s)
-      const pn = searchParams.get('pnade')
-      if (pn) sp.set('pnade', pn)
+      if (sideRaw) sp.set('side', sideRaw)
+      if (pnadeRaw) sp.set('pnade', pnadeRaw)
       return sp.toString()
     })()
     const backHref = zoneIdFromUrl ? (backQs ? `${pathname}?${backQs}` : pathname) : '/'
@@ -648,16 +736,8 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
         } else {
           // Для `both` в режиме "все" выбираем сторону, где реально есть точки,
           // иначе можно попасть на пустой экран при наличии маркера на карте.
-          const tCount = countGrenadesForPosition(
-            onLayer.filter((g) => isSideMatch(g.side, 't')),
-            pos,
-            positionCatalog,
-          )
-          const ctCount = countGrenadesForPosition(
-            onLayer.filter((g) => isSideMatch(g.side, 'ct')),
-            pos,
-            positionCatalog,
-          )
+          const tCount = countGrenadesForPosition(onLayerByT, pos, positionCatalog)
+          const ctCount = countGrenadesForPosition(onLayerByCT, pos, positionCatalog)
           sk = ctCount > tCount ? 'ct' : 't'
         }
       }
@@ -666,10 +746,14 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
       const zoneId = selectedZoneForPicker?.id ?? resolveZoneForPick(positionId)
       sp.set('zone', zoneId)
       sp.set('pos', positionId)
-      const pn = searchParams.get('pnade')
-      if (pn && parsePickerNadeParam(pn) !== 'all') sp.set('pnade', pn)
+      // Локальное `pnadeRaw` свежее, чем `useSearchParams()` (мы пишем туда `replaceState`).
+      if (pnadeRaw && parsePickerNadeParam(pnadeRaw) !== 'all') sp.set('pnade', pnadeRaw)
       // С вкладок «Карточки» / «Список» сохраняем `tab`, чтобы после закрытия позиции вернуться туда, а не на «Карту».
-      const tab = searchParams.get('tab')
+      // Свежее значение читаем из `window.location.search` — `PositionSelector` тоже пишет туда `replaceState`.
+      const tab =
+        typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search).get('tab')
+          : searchParams.get('tab')
       if (tab === 'photos' || tab === 'list') {
         sp.set('tab', tab)
       }
@@ -691,14 +775,7 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
               <PositionSelector
                 map={map}
                 pickerTeam={pickerTeam}
-                onPickerTeamChange={(team) => {
-                  navigate((sp) => {
-                    if (team === 'any') sp.set('side', 'any')
-                    else sp.set('side', team)
-                    sp.delete('pos')
-                    sp.delete('spot')
-                  })
-                }}
+                onPickerTeamChange={setPickerTeam}
                 nadeFilter={pickerNadeFilter}
                 onNadeFilterChange={setPickerNadeFilter}
                 positions={zonePickerPositions}

@@ -1,6 +1,7 @@
 'use client'
 
-import { useMemo, useState, type MouseEvent } from 'react'
+import Link from 'next/link'
+import { useMemo, useState } from 'react'
 import { useLocale, useT } from '@/i18n'
 import type { Grenade } from '@/types'
 import type { MapPosition, PositionCategory } from '@/types/positions'
@@ -14,7 +15,9 @@ interface Props {
   grenades: Grenade[]
   positionCatalog: MapPosition[]
   onPick: (positionId: string) => void
-  pickHref?: (positionId: string) => string
+  pickHref?: (positionId: string) => string | undefined
+  /** Скрывать позиции без совпадений (актуально, когда задан фильтр гранаты). */
+  hideEmpty?: boolean
 }
 
 const CATEGORY_ORDER: PositionCategory[] = [
@@ -35,6 +38,7 @@ export default function PositionPickerList({
   positionCatalog,
   onPick,
   pickHref,
+  hideEmpty = false,
 }: Props) {
   const t = useT()
   const lang = useLocale()
@@ -42,10 +46,16 @@ export default function PositionPickerList({
 
   const filtered = useMemo(
     () =>
-      positions.filter((p) =>
-        positionMatchesSearch(p, query, [t(`position.category.${p.category}` as const)]),
-      ),
-    [positions, query, t],
+      positions.filter((p) => {
+        if (!positionMatchesSearch(p, query, [t(`position.category.${p.category}` as const)])) {
+          return false
+        }
+        if (hideEmpty && countGrenadesForPosition(grenades, p, positionCatalog) === 0) {
+          return false
+        }
+        return true
+      }),
+    [positions, query, t, hideEmpty, grenades, positionCatalog],
   )
 
   const grouped = useMemo(() => {
@@ -147,12 +157,6 @@ function ListRow({
   onPick: () => void
   soonLabel: string
 }) {
-  const navigateNative = (e: MouseEvent<HTMLAnchorElement>) => {
-    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return
-    e.preventDefault()
-    window.location.assign(href!)
-  }
-
   const badge = (
     <div
       className="flex h-7 min-w-[1.75rem] shrink-0 items-center justify-center rounded-full px-2 text-[11px] font-bold"
@@ -183,9 +187,14 @@ function ListRow({
 
   if (href) {
     return (
-      <a href={href} className={className} onClick={navigateNative}>
+      <Link
+        href={href}
+        scroll={false}
+        prefetch
+        className={className}
+      >
         {main}
-      </a>
+      </Link>
     )
   }
 

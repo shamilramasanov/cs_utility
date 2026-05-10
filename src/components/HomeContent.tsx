@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import {
   useCallback,
   useEffect,
@@ -63,7 +64,7 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
   const [debouncedQuery, setDebouncedQuery] = useState('')
 
   useEffect(() => {
-    const id = window.setTimeout(() => setDebouncedQuery(query.trim()), 260)
+    const id = window.setTimeout(() => setDebouncedQuery(query.trim()), 140)
     return () => window.clearTimeout(id)
   }, [query])
 
@@ -234,7 +235,7 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
               <p className="pt-8 text-center text-sm text-[#666]">{t('common.nothingFound')}</p>
             ) : (
               <ul className="grid w-full list-none grid-cols-2 gap-3 p-0 pb-2">
-                {searchHits.map((h) => {
+                {searchHits.map((h, hitIdx) => {
                   const label = pickLocalizedLabel(h.pos, lang)
                   const zoneId = getZoneIdForPositionOnSide(
                     h.pos.map,
@@ -254,6 +255,7 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
                         pos={h.pos}
                         mapLabel={h.mapName}
                         photo={photo}
+                        imagePriority={hitIdx < 6}
                         label={label}
                         count={h.count}
                         empty={h.count === 0}
@@ -283,13 +285,16 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
         <section className="flex h-full min-h-0 w-full shrink-0 grow-0 basis-full snap-start snap-always flex-col">
             <div className="min-h-0 w-full max-w-full flex-1 overflow-y-auto overscroll-y-contain px-app-screen pt-3 pb-[calc(8.1rem+env(safe-area-inset-bottom,0px))] [-webkit-overflow-scrolling:touch]">
             <div className="grid grid-cols-2 gap-3">
-              {mapsWithCounts.map(({ map, grenadeCount }) => (
-                <Link key={map.id} href={`/map/${map.id}`}>
+              {mapsWithCounts.map(({ map, grenadeCount }, idx) => (
+                <Link key={map.id} href={`/map/${map.id}`} prefetch>
                   <div className="relative aspect-square overflow-hidden rounded-2xl bg-[#1a1a1a] transition-transform active:scale-95">
-                    <img
+                    <Image
                       src={`/minimaps/${map.radar}`}
                       alt={map.display_name}
-                      className="h-full w-full object-cover opacity-60"
+                      fill
+                      sizes="(max-width: 640px) 50vw, 25vw"
+                      priority={idx < 4}
+                      className="object-cover opacity-60"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                     <div className="absolute bottom-0 left-0 right-0 p-3">

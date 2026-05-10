@@ -53,7 +53,7 @@ function PickerNadeGlyph({
       alt=""
       width={32}
       height={32}
-      loading="lazy"
+      loading="eager"
       decoding="async"
       draggable={false}
       onError={() => setImgFailed(true)}

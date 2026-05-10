@@ -1,7 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useT } from '@/i18n'
 import type { Grenade, MapData } from '@/types'
@@ -94,28 +94,42 @@ export default function PositionSelector({
   onNadeFilterChange,
 }: Props) {
   const t = useT()
-  const router = useRouter()
-  const pathname = usePathname()
   const searchParams = useSearchParams()
 
-  const panelIndex = useMemo(() => {
+  /**
+   * Локальный state, чтобы переключение было мгновенным.
+   * Раньше это шло через `router.replace(?tab=...)`, что на `force-dynamic`
+   * странице карты заставляло сервер заново тащить данные и перерендеривать всё
+   * дерево — вкладка переключалась с задержкой в секунды.
+   * Параметр `?tab=` всё равно нужен (чтобы возврат с экрана позиции восстановил
+   * правильную вкладку), поэтому синхронизируем его «тихо» через `history.replaceState`.
+   */
+  const [panelIndex, setPanelIndexState] = useState<number>(() => {
     const tab = searchParams.get('tab')
     if (tab === 'photos') return 1
     if (tab === 'list') return 2
     return 0
+  })
+
+  /** Browser back/forward или внешняя навигация на тот же URL → подхватываем `?tab=`. */
+  useEffect(() => {
+    const tab = searchParams.get('tab')
+    const next = tab === 'photos' ? 1 : tab === 'list' ? 2 : 0
+    setPanelIndexState((prev) => (prev === next ? prev : next))
   }, [searchParams])
 
-  const setPanelIndex = useCallback(
-    (idx: number) => {
-      const i = Math.max(0, Math.min(2, idx))
-      const key = TAB_KEYS[i] satisfies PickerTabKey
-      const sp = new URLSearchParams(searchParams.toString())
-      if (sp.get('tab') === key) return
-      sp.set('tab', key)
-      router.replace(`${pathname}?${sp.toString()}`, { scroll: false })
-    },
-    [pathname, router, searchParams],
-  )
+  const setPanelIndex = useCallback((idx: number) => {
+    const i = Math.max(0, Math.min(2, idx))
+    setPanelIndexState((prev) => (prev === i ? prev : i))
+    if (typeof window === 'undefined') return
+    const key = TAB_KEYS[i] satisfies PickerTabKey
+    const url = new URL(window.location.href)
+    if (key === 'map') url.searchParams.delete('tab')
+    else url.searchParams.set('tab', key)
+    const nextHref = `${url.pathname}${url.search}${url.hash}`
+    if (nextHref === `${window.location.pathname}${window.location.search}${window.location.hash}`) return
+    window.history.replaceState(window.history.state, '', nextHref)
+  }, [])
 
   const pickerNavLabels = useMemo(
     () => [t('position.tab.map'), t('position.tab.photos'), t('position.tab.list')],
@@ -127,10 +141,35 @@ export default function PositionSelector({
     () => (positions ?? []).filter((p) => !p.parent_id),
     [positions],
   )
-  const pickHref = navigationLinks?.pickPosition
+  const pickHrefRaw = navigationLinks?.pickPosition
+
+  /**
+   * `pickHref` строится в родителе на основании `useSearchParams()`. Поскольку мы
+   * меняем `?tab=` через `history.replaceState` (минуя роутер), родитель про
+   * текущий `tab` не знает. Подменяем `tab` в готовой ссылке локальным значением,
+   * чтобы возврат с экрана позиции вернул именно ту вкладку, на которой был user.
+   */
+  const pickHref = useCallback(
+    (positionId: string): string | undefined => {
+      if (!pickHrefRaw) return undefined
+      const base = pickHrefRaw(positionId)
+      if (!base) return base
+      const qIdx = base.indexOf('?')
+      const path = qIdx === -1 ? base : base.slice(0, qIdx)
+      const sp = new URLSearchParams(qIdx === -1 ? '' : base.slice(qIdx + 1))
+      const key = TAB_KEYS[panelIndex]
+      if (key === 'map') sp.delete('tab')
+      else sp.set('tab', key)
+      const qs = sp.toString()
+      return qs ? `${path}?${qs}` : path
+    },
+    [pickHrefRaw, panelIndex],
+  )
 
   const panelIndexRef = useRef(panelIndex)
-  panelIndexRef.current = panelIndex
+  useLayoutEffect(() => {
+    panelIndexRef.current = panelIndex
+  }, [panelIndex])
 
   const navSwipeStartRef = useRef<{ x: number; y: number } | null>(null)
   const ignoreNavTabClicksRef = useRef(false)
@@ -265,6 +304,17 @@ export default function PositionSelector({
     }
   }, [selectedGrenade, updateLineupOverlayTop])
 
+  /** Стабильные callbacks — иначе `MapView` (и любая будущая `React.memo`) перерисуется на каждый ререндер. */
+  const handleMapZoomChange = useCallback((z: number) => {
+    mapPickerZoomRef.current = z
+  }, [])
+
+  const handleMapThrowVariantSelect = useCallback((g: Grenade, idx: number) => {
+    setMapPreviewGrenade(null)
+    setSelectedGrenade(g)
+    setActiveThrowVariantIndex(idx)
+  }, [])
+
   return (
     <div className="relative flex h-full min-h-0 flex-col bg-[#0d0d0d]">
       <div ref={pickerFiltersAnchorRef} className="shrink-0">
@@ -298,20 +348,14 @@ export default function PositionSelector({
             >
               <MapView
                 mapTitle={map.display_name}
-                onZoomChange={(z) => {
-                  mapPickerZoomRef.current = z
-                }}
+                onZoomChange={handleMapZoomChange}
                 radarFile={currentLayer.file}
                 grenades={mapGrenades}
                 previewGrenade={mapPreviewGrenade}
                 onPreviewChange={setMapPreviewGrenade}
                 selectedGrenade={selectedGrenade}
                 onSelect={setSelectedGrenade}
-                onThrowVariantSelect={(g, idx) => {
-                  setMapPreviewGrenade(null)
-                  setSelectedGrenade(g)
-                  setActiveThrowVariantIndex(idx)
-                }}
+                onThrowVariantSelect={handleMapThrowVariantSelect}
                 imagePosition={selectedGrenade ? 'top' : 'center'}
                 activeThrowVariantIndex={activeThrowVariantIndex}
               />
@@ -332,6 +376,7 @@ export default function PositionSelector({
                   positionCatalog={catalog}
                   onPick={onPick}
                   pickHref={pickHref}
+                  hideEmpty={nadeFilter !== 'all'}
                 />
               </div>
             </div>
@@ -350,6 +395,7 @@ export default function PositionSelector({
                   positionCatalog={catalog}
                   onPick={onPick}
                   pickHref={pickHref}
+                  hideEmpty={nadeFilter !== 'all'}
                 />
               </div>
             </div>

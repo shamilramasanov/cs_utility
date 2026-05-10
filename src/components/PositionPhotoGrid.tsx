@@ -1,6 +1,7 @@
 'use client'
 
-import { useMemo, useState, type MouseEvent } from 'react'
+import Link from 'next/link'
+import { useMemo, useState } from 'react'
 import Image from 'next/image'
 import { useLocale, useT } from '@/i18n'
 import type { Grenade } from '@/types'
@@ -16,8 +17,24 @@ interface Props {
   grenades: Grenade[]
   positionCatalog: MapPosition[]
   onPick: (positionId: string) => void
-  pickHref?: (positionId: string) => string
+  pickHref?: (positionId: string) => string | undefined
+  /**
+   * Если активен фильтр (тип гранаты), позиции без совпадений нужно скрывать,
+   * иначе плашка «Скоро» вводит в заблуждение: у позиции есть раскидки, просто
+   * не для текущего типа.
+   */
+  hideEmpty?: boolean
 }
+
+/** Группировка по категории — как в `PositionList`, чтобы UX был консистентным. */
+const CATEGORY_ORDER: PositionCategory[] = [
+  'spawn',
+  'a_site',
+  'b_site',
+  'mid',
+  'rotation',
+  'utility',
+]
 
 /**
  * Visual position picker (план §5.4): сетка 2×N карточек 16:9 со скриншотами
@@ -26,7 +43,14 @@ interface Props {
  * Фото карточки: оверрайд модератора → 4-й кадр галереи раскидки (при нехватке — 3/2/1)
  * → `screenshot_url` позиции; иначе placeholder «Без фото».
  */
-export default function PositionPhotoGrid({ positions, grenades, positionCatalog, onPick, pickHref }: Props) {
+export default function PositionPhotoGrid({
+  positions,
+  grenades,
+  positionCatalog,
+  onPick,
+  pickHref,
+  hideEmpty = false,
+}: Props) {
   const t = useT()
   const lang = useLocale()
   const { screenshotFor } = usePositionOverrides()
@@ -34,21 +58,17 @@ export default function PositionPhotoGrid({ positions, grenades, positionCatalog
 
   const filtered = useMemo(
     () =>
-      positions.filter((p) =>
-        positionMatchesSearch(p, query, [t(`position.category.${p.category}` as const)]),
-      ),
-    [positions, query, t],
+      positions.filter((p) => {
+        if (!positionMatchesSearch(p, query, [t(`position.category.${p.category}` as const)])) {
+          return false
+        }
+        if (hideEmpty && countGrenadesForPosition(grenades, p, positionCatalog) === 0) {
+          return false
+        }
+        return true
+      }),
+    [positions, query, t, hideEmpty, grenades, positionCatalog],
   )
-
-  /** Группировка по категории — как в `PositionList`, чтобы UX был консистентным. */
-  const CATEGORY_ORDER: PositionCategory[] = [
-    'spawn',
-    'a_site',
-    'b_site',
-    'mid',
-    'rotation',
-    'utility',
-  ]
 
   const grouped = useMemo(() => {
     const map = new Map<PositionCategory, MapPosition[]>()
@@ -101,20 +121,23 @@ export default function PositionPhotoGrid({ positions, grenades, positionCatalog
                 {t(`position.category.${cat}` as const)}
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                {items.map((pos) => {
-                    const count = countGrenadesForPosition(grenades, pos, positionCatalog)
+                {items.map((pos, idxInCat) => {
+                  const count = countGrenadesForPosition(grenades, pos, positionCatalog)
                   const empty = count === 0
                   const label = pickLocalizedLabel(pos, lang)
                   const lineupPhoto = pickPositionCardLineupPhoto(grenades, pos, positionCatalog)
                   const photo =
                     screenshotFor(pos.id, undefined) ?? lineupPhoto ?? pos.screenshot_url
                   const mapLabel = getMap(pos.map)?.display_name ?? pos.map
+                  /** Первые карточки — приоритет для LCP / быстрого показа сетки. */
+                  const imagePriority = idxInCat < 4 && grouped[0]?.cat === cat
                   return (
                     <PositionPhotoCard
                       key={pos.id}
                       pos={pos}
                       mapLabel={mapLabel}
                       photo={photo}
+                      imagePriority={imagePriority}
                       label={label}
                       count={count}
                       empty={empty}
@@ -197,6 +220,8 @@ interface CardProps {
   pos: MapPosition
   mapLabel: string
   photo?: string
+  /** Первые видимые карточки — быстрее подгрузка превью (`next/image` priority). */
+  imagePriority?: boolean
   label: string
   count: number
   empty: boolean
@@ -205,7 +230,7 @@ interface CardProps {
   singlePill?: 'T' | 'CT'
   onPick: (id: string) => void
   href?: string
-  /** Перед `location.assign` с главной и т.п. — например, пометить «вернуться в поиск». */
+  /** Перед клиентским переходом — например, пометить «вернуться в поиск». */
   onBeforeClientNavigate?: () => void
   noPhotoLabel: string
   soonLabel: string
@@ -215,6 +240,7 @@ export function PositionPhotoCard({
   pos,
   mapLabel,
   photo,
+  imagePriority = false,
   label,
   count,
   empty,
@@ -245,6 +271,7 @@ export function PositionPhotoCard({
           src={photo}
           alt={label}
           fill
+          priority={imagePriority}
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           className="pointer-events-none select-none object-cover"
           draggable={false}
@@ -289,20 +316,19 @@ export function PositionPhotoCard({
   )
 
   if (href) {
-    const navigateNative = (e: MouseEvent<HTMLAnchorElement>) => {
-      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return
-      e.preventDefault()
-      onBeforeClientNavigate?.()
-      window.location.assign(href)
-    }
     return (
-      <a
+      <Link
         href={href}
+        scroll={false}
+        prefetch
+        onClick={(e) => {
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return
+          onBeforeClientNavigate?.()
+        }}
         className={`${className} ${emptyMuted}`}
-        onClick={navigateNative}
       >
         {deco}
-      </a>
+      </Link>
     )
   }
 
