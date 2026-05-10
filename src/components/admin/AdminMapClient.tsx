@@ -414,6 +414,19 @@ export default function AdminMapClient({
 
   const deleteSelectedCustom = async () => {
     if (!selectedCustom) return
+    const vars = selectedCustom.throw_variants
+    const variantCount = vars?.length ?? 0
+    let confirmMsg: string
+    if (variantCount > 1) {
+      confirmMsg = `Удалить всю раскидку целиком? Сейчас в ней ${variantCount} варианта броска в одну точку приёма — удалятся все вместе с общим описанием, текстами вариантов и медиа. Это нельзя отменить.`
+    } else if (variantCount === 1) {
+      confirmMsg =
+        'Удалить эту раскидку? Уйдёт вариант броска (и общее описание/медиа точки) с сервера. Это нельзя отменить.'
+    } else {
+      confirmMsg =
+        'Удалить эту пользовательскую точку с карты? Весь контент (описание, видео, фото) будет удалён с сервера. Это нельзя отменить.'
+    }
+    if (!window.confirm(confirmMsg)) return
     const next = allLineups.filter((l) => l.id !== selectedCustom.id)
     setAllLineups(next)
     setSelectedKey(null)
@@ -1312,28 +1325,39 @@ export default function AdminMapClient({
                     >
                       Указать приём кликом по радару
                     </button>
-                    <div className="space-y-3 border border-[#333] rounded-xl p-2 bg-[#1a1a1a]">
-                      {selectedCustom.throw_variants.map((tv, idx) => (
-                        <div
-                          key={tv.id}
-                          className="border-b border-[#2a2a2a] last:border-0 pb-3 last:pb-0 space-y-2"
-                        >
-                          <div className="flex justify-between items-center gap-2">
-                            <span className="text-xs font-medium text-[#F0B429]">
+                    <div className="rounded-xl border-2 border-[#6b5420]/80 bg-gradient-to-b from-[#1a1508] to-[#141208] p-3 shadow-[inset_0_0_0_1px_rgba(240,180,41,0.08)]">
+                      <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#d4a017]">
+                        Варианты броска в одну точку приёма
+                      </p>
+                      <div className="space-y-5">
+                        {selectedCustom.throw_variants.map((tv, idx) => (
+                          <div
+                            key={tv.id}
+                            className="space-y-2 rounded-xl border-2 border-[#3a3a3a] bg-[#181818] p-3 shadow-md ring-1 ring-black/40"
+                          >
+                          <div className="flex justify-between items-center gap-2 border-b border-[#333] pb-2">
+                            <span className="text-xs font-semibold text-[#F0B429]">
                               Бросок {idx + 1}
                             </span>
                             {selectedCustom.throw_variants!.length > 1 && (
                               <button
                                 type="button"
-                                className="text-xs text-red-400 px-2 py-1"
+                                className="rounded-lg border border-red-900/60 bg-[#2a1515] px-2.5 py-1 text-xs text-red-300 hover:bg-[#3a1a1a]"
                                 onClick={() => {
+                                  if (
+                                    !window.confirm(
+                                      `Удалить только вариант «Бросок ${idx + 1}»? Остальные варианты в этой раскидке останутся.`,
+                                    )
+                                  ) {
+                                    return
+                                  }
                                   const next = selectedCustom.throw_variants!.filter((w) => w.id !== tv.id)
                                   updateSelectedCustom({
                                     throw_variants: next.length ? next : undefined,
                                   })
                                 }}
                               >
-                                Удалить
+                                Удалить вариант
                               </button>
                             )}
                           </div>
@@ -1483,37 +1507,45 @@ export default function AdminMapClient({
                               updateSelectedCustom({ throw_variants: next })
                             }}
                           />
-                        </div>
-                      ))}
-                      <button
-                        type="button"
-                        className={`w-full ${BTN_SECONDARY}`}
-                        onClick={() => {
-                          const last = selectedCustom.throw_variants!.slice(-1)[0]
-                          updateSelectedCustom({
-                            throw_variants: [
-                              ...selectedCustom.throw_variants!,
-                              newVariantRow(selectedCustom.x, selectedCustom.y, last),
-                            ],
-                          })
-                        }}
-                      >
-                        + Ещё вариант броска
-                      </button>
-                      <button
-                        type="button"
-                        className={`w-full ${BTN_SECONDARY}`}
-                        onClick={() => {
-                          const newVar = newVariantRow(selectedCustom.x, selectedCustom.y)
-                          updateSelectedCustom({
-                            throw_variants: [...selectedCustom.throw_variants!, newVar],
-                          })
-                          exitAddModeFully()
-                          setRadarPick({ kind: 'start', variantId: newVar.id })
-                        }}
-                      >
-                        + Вариант кликом по радару
-                      </button>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-6 space-y-3 border-t-2 border-dashed border-[#7a6220]/90 bg-[#0f0d0a]/80 px-1 pt-5">
+                        <p className="text-[11px] font-semibold text-[#e8bc3a]">Добавить ещё один бросок сюда же</p>
+                        <p className="text-[10px] leading-snug text-[#777]">
+                          Новый блок ниже — отдельная стартовая позиция и своё медиа, но тот же приём (маркер на
+                          радаре общий).
+                        </p>
+                        <button
+                          type="button"
+                          className={`w-full ${BTN_SECONDARY}`}
+                          onClick={() => {
+                            const last = selectedCustom.throw_variants!.slice(-1)[0]
+                            updateSelectedCustom({
+                              throw_variants: [
+                                ...selectedCustom.throw_variants!,
+                                newVariantRow(selectedCustom.x, selectedCustom.y, last),
+                              ],
+                            })
+                          }}
+                        >
+                          + Ещё вариант броска
+                        </button>
+                        <button
+                          type="button"
+                          className={`w-full ${BTN_SECONDARY}`}
+                          onClick={() => {
+                            const newVar = newVariantRow(selectedCustom.x, selectedCustom.y)
+                            updateSelectedCustom({
+                              throw_variants: [...selectedCustom.throw_variants!, newVar],
+                            })
+                            exitAddModeFully()
+                            setRadarPick({ kind: 'start', variantId: newVar.id })
+                          }}
+                        >
+                          + Вариант кликом по радару
+                        </button>
+                      </div>
                     </div>
                   </>
                 ) : (
@@ -1549,7 +1581,9 @@ export default function AdminMapClient({
                     : `Точка: ${selectedCustom.x.toFixed(4)}, ${selectedCustom.y.toFixed(4)}`}
                 </p>
                 <button type="button" onClick={deleteSelectedCustom} className={`w-full ${BTN_DANGER}`}>
-                  Удалить точку
+                  {selectedCustom.throw_variants && selectedCustom.throw_variants.length > 1
+                    ? 'Удалить всю раскидку (все варианты)'
+                    : 'Удалить точку'}
                 </button>
               </div>
             )}
