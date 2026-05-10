@@ -4,9 +4,8 @@ import { POSITIONS_EXTENDED_CALLOUTS } from './positions-callouts'
 /**
  * Стартовый каталог позиций (callouts).
  *
- * `de_mirage`: T-спавн — одна позиция `mirage_t_spawn` (без placeholder под-точек);
- * прочие placeholder-callouts (Рампа, Палас, …) не храним — добавляйте позиции через
- * `position-catalog-extensions.json` или админку каталога.
+ * `de_mirage`: в этом файле позиций нет — только `position-catalog-extensions.json`
+ * (или админка каталога).
  *
  * Для остальных карт — `spawnGroup` + `positions-callouts.ts`.
  */
@@ -66,18 +65,6 @@ function spawnGroup(opts: {
 }
 
 export const positions: MapPosition[] = [
-  // ─── Mirage (один T-спавн без sub-spot пакета — меньше шума в каталоге) ───
-  {
-    id: 'mirage_t_spawn',
-    map: 'de_mirage',
-    side: 'T',
-    category: 'spawn',
-    label: 'T Spawn',
-    label_i18n: { ru: 'Т-спавн', en: 'T Spawn', uk: 'Т-спавн' },
-    aliases: ['tspawn', 't_spawn', 'спавн'],
-    hotspot: { x: 0.87, y: 0.36, radius: 0.06 },
-  },
-
   // ─── Dust II ───────────────────────────────────────────────────────────────
   ...spawnGroup({ mapId: 'de_dust2', side: 'T', center: { x: 0.39, y: 0.91 } }),
   ...spawnGroup({ mapId: 'de_dust2', side: 'CT', center: { x: 0.62, y: 0.21 } }),

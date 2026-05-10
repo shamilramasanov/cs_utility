@@ -1,3 +1,24 @@
 {
-  "positions": []
+  "positions": [
+    {
+      "id": "Mid_connector",
+      "map": "de_mirage",
+      "side": "T",
+      "category": "spawn",
+      "label": "Connector",
+      "label_i18n": { "ru": "Коннектор", "en": "Connector", "uk": "Коннектор" },
+      "aliases": ["connector", "mid connector", "коннектор"],
+      "hotspot": { "x": 0.5, "y": 0.5, "radius": 0.05 }
+    },
+    {
+      "id": "A_sight_stairs",
+      "map": "de_mirage",
+      "side": "T",
+      "category": "a_site",
+      "label": "Stairs",
+      "label_i18n": { "ru": "Лестница", "en": "Stairs", "uk": "Сходи" },
+      "aliases": ["stairs", "a stairs", "лестница"],
+      "hotspot": { "x": 0.5, "y": 0.5, "radius": 0.05 }
+    }
+  ]
 }

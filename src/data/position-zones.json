@@ -3,11 +3,17 @@
     "de_mirage": {
       "t": [
         {
-          "id": "spawn",
-          "label": "Т-спавн",
-          "image_url": "/uploads/grenades/271063fb-89da-4925-9fbc-4c4c3d14e3af.png",
+          "id": "connector",
+          "label": "Коннектор",
           "order": 1,
-          "position_ids": ["mirage_t_spawn"],
+          "position_ids": ["Mid_connector"],
+          "disabled_position_ids": []
+        },
+        {
+          "id": "a_site",
+          "label": "Сайт A",
+          "order": 2,
+          "position_ids": ["A_sight_stairs"],
           "disabled_position_ids": []
         }
       ]

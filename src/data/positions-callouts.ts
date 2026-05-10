@@ -1,5 +1,5 @@
 /**
- * Полные каталоги callouts для всех карт кроме Mirage (Mirage см. positions.ts).
+ * Полные каталоги callouts для всех карт кроме Mirage (Mirage — `position-catalog-extensions.json`).
  * Источники: Total CS callouts, CS Console, Liquipedia, cs2pulse / сообщество.
  * Координаты hotspot — приблизительные (норм. PNG-радар), можно уточнять через DevTools.
  */
