@@ -72,48 +72,17 @@ function MarkerShapeOutline({ type, color }: { type: GrenadeType; color: string 
   }
 }
 
-function GrenadeIcon({ type, color }: { type: GrenadeType; color: string }) {
-  switch (type) {
-    case 'flash':
-      return (
-        <path
-          d="M13.2 2.8 5.9 13h5l-1 8.2 8.2-11.3h-5.2l.3-7.1Z"
-          fill={color}
-          stroke="#111"
-          strokeWidth="0.7"
-          strokeLinejoin="round"
-        />
-      )
-    case 'molotov':
-      return (
-        <path
-          d="M12.5 21c3.2-.6 5.2-2.8 5.2-5.9 0-2.5-1.4-4.6-3.1-6.4-.4 1.6-1.3 2.6-2.5 3.4.5-3.1-.7-5.5-3.2-7.7.1 3.9-2.6 6-2.6 10.4 0 3.2 2.5 5.6 6.2 6.2Z"
-          fill={color}
-          stroke="#111"
-          strokeWidth="0.7"
-          strokeLinejoin="round"
-        />
-      )
-    case 'he':
-      return (
-        <path
-          d="M12 3.4 13.9 9l5.9-1.2-4 4.4 4 4.4-5.9-1.2L12 21l-1.9-5.6-5.9 1.2 4-4.4-4-4.4L10.1 9 12 3.4Z"
-          fill={color}
-          stroke="#111"
-          strokeWidth="0.7"
-          strokeLinejoin="round"
-        />
-      )
-    case 'smoke':
-    default:
-      return (
-        <g fill="none" stroke={color} strokeWidth="2.8" strokeLinecap="round">
-          <path d="M4.2 8.2c1.9-1.7 4-1.7 5.9 0s4 1.7 5.9 0 3.3-1.5 4.5-.3" />
-          <path d="M3.8 13c1.9-1.7 4.2-1.7 6.2 0s4.2 1.7 6.2 0 3.5-1.5 4.8-.2" />
-          <path d="M5.3 17.8c1.5-1.2 3.2-1.2 4.8 0s3.3 1.2 4.8 0" />
-        </g>
-      )
-  }
+const GRENADE_ICON_MASKS: Record<GrenadeType, string> = {
+  flash: '/grenade-icons/flash.png',
+  he: '/grenade-icons/he.png',
+  molotov: '/grenade-icons/molotov.png',
+  smoke: '/grenade-icons/smoke.png',
+}
+
+function grenadeIconSize(type: GrenadeType): string {
+  if (type === 'smoke') return '76%'
+  if (type === 'he') return '70%'
+  return '64%'
 }
 
 function MarkerFace({
@@ -130,6 +99,14 @@ function MarkerFace({
   const base =
     'relative flex h-full w-full items-center justify-center overflow-visible transition-all box-border'
   const scaleWrap = { transform: `scale(${scale})` } as React.CSSProperties
+  const iconMask = `url(${GRENADE_ICON_MASKS[type]}) center / contain no-repeat`
+  const iconStyle: React.CSSProperties = {
+    width: grenadeIconSize(type),
+    height: grenadeIconSize(type),
+    backgroundColor: outlineColor,
+    WebkitMask: iconMask,
+    mask: iconMask,
+  }
 
   return (
     <div className={base} style={{ ...faceStyle, ...scaleWrap }}>
@@ -140,15 +117,11 @@ function MarkerFace({
       >
         <MarkerShapeOutline type={type} color={outlineColor} />
       </svg>
-      <svg
-        className={`pointer-events-none relative z-10 overflow-visible ${
-          type === 'smoke' ? 'h-[72%] w-[72%]' : 'h-[58%] w-[58%]'
-        }`}
-        viewBox="0 0 24 24"
+      <span
+        className="pointer-events-none relative z-10 block"
+        style={iconStyle}
         aria-hidden
-      >
-        <GrenadeIcon type={type} color={outlineColor} />
-      </svg>
+      />
     </div>
   )
 }
