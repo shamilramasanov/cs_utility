@@ -55,6 +55,7 @@ const THROW_GUIDE_HINTS: Record<string, string> = {
 const VARIANT_SWIPE_START_PX = 8
 const VARIANT_SWIPE_COMMIT_PX = 36
 const VARIANT_SWIPE_COMMIT_RATIO = 0.22
+const VARIANT_TRACK_TRANSITION = 'transform 300ms cubic-bezier(0.22, 0.72, 0.18, 1)'
 
 export default function BottomSheet({
   grenade,
@@ -67,12 +68,13 @@ export default function BottomSheet({
   const sheetRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const mediaScrollRef = useRef<HTMLDivElement>(null)
+  const variantMediaTrackRef = useRef<HTMLDivElement>(null)
   const startY = useRef(0)
   const isDragging = useRef(false)
   const [showThrowGuide, setShowThrowGuide] = useState(false)
   const [portalReady, setPortalReady] = useState(false)
-  const [variantDragOffsetPx, setVariantDragOffsetPx] = useState(0)
-  const [variantDragActive, setVariantDragActive] = useState(false)
+  const variantRafRef = useRef<number | null>(null)
+  const variantPendingOffsetRef = useRef(0)
   const variantSwipeStartRef = useRef<{
     x: number
     y: number
@@ -149,31 +151,68 @@ export default function BottomSheet({
 
   useEffect(
     () => () => {
+      if (variantRafRef.current !== null) {
+        window.cancelAnimationFrame(variantRafRef.current)
+        variantRafRef.current = null
+      }
       unlockHorizontalSwipeScroll()
       teardownThrowVariantSwipeWindow()
     },
     [],
   )
 
+  const setVariantTrackTransform = useCallback(
+    (index: number, offsetPx: number, transition?: string) => {
+      const el = variantMediaTrackRef.current
+      if (!el) return
+      if (transition !== undefined) el.style.transition = transition
+      el.style.transform = `translate3d(calc(${-index * mediaPageWidthPercent}% + ${offsetPx}px), 0, 0)`
+    },
+    [mediaPageWidthPercent],
+  )
+
+  const cancelVariantRaf = useCallback(() => {
+    if (variantRafRef.current === null) return
+    window.cancelAnimationFrame(variantRafRef.current)
+    variantRafRef.current = null
+  }, [])
+
+  const scheduleVariantDragFrame = useCallback(
+    (index: number, offsetPx: number) => {
+      variantPendingOffsetRef.current = offsetPx
+      if (variantRafRef.current !== null) return
+      variantRafRef.current = window.requestAnimationFrame(() => {
+        variantRafRef.current = null
+        setVariantTrackTransform(index, variantPendingOffsetRef.current, 'none')
+      })
+    },
+    [setVariantTrackTransform],
+  )
+
+  const settleVariantTrack = useCallback(
+    (index: number) => {
+      cancelVariantRaf()
+      setVariantTrackTransform(index, 0, VARIANT_TRACK_TRANSITION)
+    },
+    [cancelVariantRaf, setVariantTrackTransform],
+  )
+
   const handleVariantIndexChange = useCallback(
     (next: number) => {
-      setVariantDragActive(false)
-      setVariantDragOffsetPx(0)
+      settleVariantTrack(next)
       onThrowVariantIndexChange?.(next)
     },
-    [onThrowVariantIndexChange],
+    [onThrowVariantIndexChange, settleVariantTrack],
   )
 
   const variantMediaTrackStyle = useMemo(
     () => ({
       width: `${mediaPageCount * 100}%`,
-      transform: `translate3d(calc(${-vi * mediaPageWidthPercent}% + ${variantDragOffsetPx}px), 0, 0)`,
-      transition: variantDragActive
-        ? 'none'
-        : 'transform 300ms cubic-bezier(0.22, 0.72, 0.18, 1)',
+      transform: `translate3d(${-vi * mediaPageWidthPercent}%, 0, 0)`,
+      transition: VARIANT_TRACK_TRANSITION,
       willChange: 'transform',
     }),
-    [mediaPageCount, mediaPageWidthPercent, variantDragActive, variantDragOffsetPx, vi],
+    [mediaPageCount, mediaPageWidthPercent, vi],
   )
   const variantMediaPanelStyle = useMemo(
     () => ({ width: `${mediaPageWidthPercent}%` }),
@@ -193,15 +232,19 @@ export default function BottomSheet({
       const start = variantSwipeStartRef.current
       variantSwipeStartRef.current = null
       unlockHorizontalSwipeScroll()
-      setVariantDragActive(false)
-      setVariantDragOffsetPx(0)
-      if (!start) return
+      if (!start) {
+        settleVariantTrack(vi)
+        return
+      }
 
       const dx = clientX - start.x
       const dy = clientY - start.y
       const ax = Math.abs(dx)
       const ay = Math.abs(dy)
-      if (!start.dragging && (ax < VARIANT_SWIPE_COMMIT_PX || ax < ay * 1.08)) return
+      if (!start.dragging && (ax < VARIANT_SWIPE_COMMIT_PX || ax < ay * 1.08)) {
+        settleVariantTrack(start.activeIndex)
+        return
+      }
 
       const offset = variantDragOffsetFor(start.width, start.activeIndex, dx)
       const commitDistance = Math.max(VARIANT_SWIPE_COMMIT_PX, start.width * VARIANT_SWIPE_COMMIT_RATIO)
@@ -211,10 +254,13 @@ export default function BottomSheet({
           : offset > commitDistance
             ? start.activeIndex - 1
             : start.activeIndex
-      if (next < 0 || next >= variantCount || next === start.activeIndex) return
+      if (next < 0 || next >= variantCount || next === start.activeIndex) {
+        settleVariantTrack(start.activeIndex)
+        return
+      }
       handleVariantIndexChange(next)
     },
-    [handleVariantIndexChange, variantCount, variantDragOffsetFor],
+    [handleVariantIndexChange, settleVariantTrack, variantCount, variantDragOffsetFor, vi],
   )
 
   const onMediaBlockSwipeTouchStart = (e: React.TouchEvent) => {
@@ -249,10 +295,13 @@ export default function BottomSheet({
       }
       start.dragging = true
       lockHorizontalSwipeScroll()
-      setVariantDragActive(true)
+      setVariantTrackTransform(start.activeIndex, 0, 'none')
     }
     e.preventDefault()
-    setVariantDragOffsetPx(variantDragOffsetFor(start.width, start.activeIndex, dx))
+    scheduleVariantDragFrame(
+      start.activeIndex,
+      variantDragOffsetFor(start.width, start.activeIndex, dx),
+    )
   }
 
   const onMediaBlockSwipeTouchEnd = (e: React.TouchEvent) => {
@@ -260,8 +309,7 @@ export default function BottomSheet({
     if (!changed) {
       variantSwipeStartRef.current = null
       unlockHorizontalSwipeScroll()
-      setVariantDragActive(false)
-      setVariantDragOffsetPx(0)
+      settleVariantTrack(vi)
       return
     }
     finishVariantSwipe(changed.clientX, changed.clientY)
@@ -457,10 +505,10 @@ export default function BottomSheet({
           onTouchMove={onMediaBlockSwipeTouchMove}
           onTouchEnd={onMediaBlockSwipeTouchEnd}
           onTouchCancel={() => {
+            const index = variantSwipeStartRef.current?.activeIndex ?? vi
             variantSwipeStartRef.current = null
             unlockHorizontalSwipeScroll()
-            setVariantDragActive(false)
-            setVariantDragOffsetPx(0)
+            settleVariantTrack(index)
           }}
         >
         {/* Компактный ряд: тип, заголовок, бросок/позиция, закрыть */}
@@ -501,7 +549,7 @@ export default function BottomSheet({
         )}
 
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="flex h-full min-h-0" style={variantMediaTrackStyle}>
+          <div ref={variantMediaTrackRef} className="flex h-full min-h-0" style={variantMediaTrackStyle}>
             {Array.from({ length: mediaPageCount }, (_, i) => (
               <div
                 key={`${grenade.id}:panel:${i}`}
@@ -559,10 +607,10 @@ export default function BottomSheet({
           onTouchMove={onMediaBlockSwipeTouchMove}
           onTouchEnd={onMediaBlockSwipeTouchEnd}
           onTouchCancel={() => {
+            const index = variantSwipeStartRef.current?.activeIndex ?? vi
             variantSwipeStartRef.current = null
             unlockHorizontalSwipeScroll()
-            setVariantDragActive(false)
-            setVariantDragOffsetPx(0)
+            settleVariantTrack(index)
           }}
         >
         <div className="relative flex shrink-0 items-start gap-2 border-b border-[#333]/80 px-5 pb-2 pt-1">
@@ -608,7 +656,7 @@ export default function BottomSheet({
         )}
 
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="flex h-full min-h-0" style={variantMediaTrackStyle}>
+          <div ref={variantMediaTrackRef} className="flex h-full min-h-0" style={variantMediaTrackStyle}>
             {Array.from({ length: mediaPageCount }, (_, i) => (
               <div
                 key={`${grenade.id}:panel:${i}`}

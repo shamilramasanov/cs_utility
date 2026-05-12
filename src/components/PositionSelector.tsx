@@ -26,6 +26,7 @@ const TAB_COUNT = TAB_KEYS.length
 const NAV_SWIPE_START_PX = 8
 const NAV_SWIPE_COMMIT_PX = 36
 const NAV_SWIPE_COMMIT_RATIO = 0.22
+const NAV_TRACK_TRANSITION = 'transform 320ms cubic-bezier(0.22, 0.72, 0.18, 1)'
 
 interface Props {
   map: MapData
@@ -176,8 +177,10 @@ export default function PositionSelector({
     panelIndexRef.current = panelIndex
   }, [panelIndex])
 
-  const [navDragOffsetPx, setNavDragOffsetPx] = useState(0)
-  const [navDragActive, setNavDragActive] = useState(false)
+  const panelWidthPercent = 100 / TAB_COUNT
+  const navTrackRef = useRef<HTMLDivElement>(null)
+  const navRafRef = useRef<number | null>(null)
+  const navPendingOffsetRef = useRef(0)
   const navSwipeStartRef = useRef<{
     x: number
     y: number
@@ -188,6 +191,42 @@ export default function PositionSelector({
   const ignoreNavTabClicksRef = useRef(false)
   /** Синхронно с MapView: при зуме > 1 свайп по карте не переключает вкладки (пан/пинч). */
   const mapPickerZoomRef = useRef(1)
+
+  const setNavTrackTransform = useCallback(
+    (index: number, offsetPx: number, transition?: string) => {
+      const el = navTrackRef.current
+      if (!el) return
+      if (transition !== undefined) el.style.transition = transition
+      el.style.transform = `translate3d(calc(${-index * panelWidthPercent}% + ${offsetPx}px), 0, 0)`
+    },
+    [panelWidthPercent],
+  )
+
+  const cancelNavRaf = useCallback(() => {
+    if (navRafRef.current === null) return
+    window.cancelAnimationFrame(navRafRef.current)
+    navRafRef.current = null
+  }, [])
+
+  const scheduleNavDragFrame = useCallback(
+    (index: number, offsetPx: number) => {
+      navPendingOffsetRef.current = offsetPx
+      if (navRafRef.current !== null) return
+      navRafRef.current = window.requestAnimationFrame(() => {
+        navRafRef.current = null
+        setNavTrackTransform(index, navPendingOffsetRef.current, 'none')
+      })
+    },
+    [setNavTrackTransform],
+  )
+
+  const settleNavTrack = useCallback(
+    (index: number) => {
+      cancelNavRaf()
+      setNavTrackTransform(index, 0, NAV_TRACK_TRANSITION)
+    },
+    [cancelNavRaf, setNavTrackTransform],
+  )
 
   useEffect(() => {
     const swipeExcluded = (target: EventTarget | null) => {
@@ -209,25 +248,33 @@ export default function PositionSelector({
       const start = navSwipeStartRef.current
       navSwipeStartRef.current = null
       unlockHorizontalSwipeScroll()
-      setNavDragActive(false)
-      setNavDragOffsetPx(0)
-      if (!start) return
+      if (!start) {
+        settleNavTrack(panelIndexRef.current)
+        return
+      }
 
       const dx = clientX - start.x
       const dy = clientY - start.y
       const ax = Math.abs(dx)
       const ay = Math.abs(dy)
-      if (!start.dragging && (ax < NAV_SWIPE_COMMIT_PX || ax < ay * 1.08)) return
+      if (!start.dragging && (ax < NAV_SWIPE_COMMIT_PX || ax < ay * 1.08)) {
+        settleNavTrack(start.panelIndex)
+        return
+      }
 
       const offset = dragOffsetFor(start, dx)
       const commitDistance = Math.max(NAV_SWIPE_COMMIT_PX, start.width * NAV_SWIPE_COMMIT_RATIO)
       const next = offset < -commitDistance ? start.panelIndex + 1 : offset > commitDistance ? start.panelIndex - 1 : start.panelIndex
-      if (next < 0 || next >= TAB_COUNT || next === start.panelIndex) return
+      if (next < 0 || next >= TAB_COUNT || next === start.panelIndex) {
+        settleNavTrack(start.panelIndex)
+        return
+      }
 
       ignoreNavTabClicksRef.current = true
       window.setTimeout(() => {
         ignoreNavTabClicksRef.current = false
       }, 400)
+      settleNavTrack(next)
       setPanelIndex(next)
     }
     const onPointerDownCapture = (e: PointerEvent) => {
@@ -261,33 +308,34 @@ export default function PositionSelector({
         }
         start.dragging = true
         lockHorizontalSwipeScroll()
-        setNavDragActive(true)
+        setNavTrackTransform(start.panelIndex, 0, 'none')
       }
       if (e.cancelable) e.preventDefault()
-      setNavDragOffsetPx(dragOffsetFor(start, dx))
+      scheduleNavDragFrame(start.panelIndex, dragOffsetFor(start, dx))
     }
     const onPointerUpCapture = (e: PointerEvent) => {
       if (!e.isPrimary) return
       finishNavSwipe(e.clientX, e.clientY)
     }
     const onPointerCancelCapture = () => {
+      const index = navSwipeStartRef.current?.panelIndex ?? panelIndexRef.current
       navSwipeStartRef.current = null
       unlockHorizontalSwipeScroll()
-      setNavDragActive(false)
-      setNavDragOffsetPx(0)
+      settleNavTrack(index)
     }
     window.addEventListener('pointerdown', onPointerDownCapture, true)
     window.addEventListener('pointermove', onPointerMoveCapture, true)
     window.addEventListener('pointerup', onPointerUpCapture, true)
     window.addEventListener('pointercancel', onPointerCancelCapture, true)
     return () => {
+      cancelNavRaf()
       unlockHorizontalSwipeScroll()
       window.removeEventListener('pointerdown', onPointerDownCapture, true)
       window.removeEventListener('pointermove', onPointerMoveCapture, true)
       window.removeEventListener('pointerup', onPointerUpCapture, true)
       window.removeEventListener('pointercancel', onPointerCancelCapture, true)
     }
-  }, [setPanelIndex])
+  }, [cancelNavRaf, scheduleNavDragFrame, setNavTrackTransform, settleNavTrack, setPanelIndex])
 
   const pickerFiltersAnchorRef = useRef<HTMLDivElement>(null)
   const [lineupOverlayTopPx, setLineupOverlayTopPx] = useState(0)
@@ -377,17 +425,14 @@ export default function PositionSelector({
     setActiveThrowVariantIndex(idx)
   }, [])
 
-  const panelWidthPercent = 100 / TAB_COUNT
   const navTrackStyle = useMemo(
     () => ({
       width: `${TAB_COUNT * 100}%`,
-      transform: `translate3d(calc(${-panelIndex * panelWidthPercent}% + ${navDragOffsetPx}px), 0, 0)`,
-      transition: navDragActive
-        ? 'none'
-        : 'transform 320ms cubic-bezier(0.22, 0.72, 0.18, 1)',
+      transform: `translate3d(${-panelIndex * panelWidthPercent}%, 0, 0)`,
+      transition: NAV_TRACK_TRANSITION,
       willChange: 'transform',
     }),
-    [navDragActive, navDragOffsetPx, panelIndex, panelWidthPercent],
+    [panelIndex, panelWidthPercent],
   )
   const navPanelStyle = useMemo(
     () => ({ width: `${panelWidthPercent}%` }),
@@ -422,7 +467,7 @@ export default function PositionSelector({
           className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
           style={{ touchAction: 'pan-y' }}
         >
-          <div className="flex h-full min-h-0 shrink-0" style={navTrackStyle}>
+          <div ref={navTrackRef} className="flex h-full min-h-0 shrink-0" style={navTrackStyle}>
             <section
               className="flex min-h-0 shrink-0 flex-col px-app-screen pt-1 pb-[max(5.5rem,env(safe-area-inset-bottom,0px)+4.5rem)]"
               style={navPanelStyle}

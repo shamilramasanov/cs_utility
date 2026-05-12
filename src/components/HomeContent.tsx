@@ -31,6 +31,7 @@ const TAB_COUNT = 4
 const NAV_SWIPE_START_PX = 8
 const NAV_SWIPE_COMMIT_PX = 36
 const NAV_SWIPE_COMMIT_RATIO = 0.22
+const NAV_TRACK_TRANSITION = 'transform 320ms cubic-bezier(0.22, 0.72, 0.18, 1)'
 /** Иконки нижней навигации — `public/nav/*.png` */
 const NAV_ICON_SRC = [
   APP_SEARCH_ICON_SRC,
@@ -62,11 +63,13 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
   const lang = useLocale()
   const { screenshotFor } = usePositionOverrides()
   const trackRef = useRef<HTMLDivElement>(null)
+  const homeTrackRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [activeIndex, setActiveIndex] = useState(1)
   const activeIndexRef = useRef(activeIndex)
-  const [navDragOffsetPx, setNavDragOffsetPx] = useState(0)
-  const [navDragActive, setNavDragActive] = useState(false)
+  const panelWidthPercent = 100 / TAB_COUNT
+  const navRafRef = useRef<number | null>(null)
+  const navPendingOffsetRef = useRef(0)
   const navSwipeStartRef = useRef<{
     x: number
     y: number
@@ -77,6 +80,42 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
   const ignoreHomeClickRef = useRef(false)
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
+
+  const setHomeTrackTransform = useCallback(
+    (index: number, offsetPx: number, transition?: string) => {
+      const el = homeTrackRef.current
+      if (!el) return
+      if (transition !== undefined) el.style.transition = transition
+      el.style.transform = `translate3d(calc(${-index * panelWidthPercent}% + ${offsetPx}px), 0, 0)`
+    },
+    [panelWidthPercent],
+  )
+
+  const cancelNavRaf = useCallback(() => {
+    if (navRafRef.current === null) return
+    window.cancelAnimationFrame(navRafRef.current)
+    navRafRef.current = null
+  }, [])
+
+  const scheduleHomeDragFrame = useCallback(
+    (index: number, offsetPx: number) => {
+      navPendingOffsetRef.current = offsetPx
+      if (navRafRef.current !== null) return
+      navRafRef.current = window.requestAnimationFrame(() => {
+        navRafRef.current = null
+        setHomeTrackTransform(index, navPendingOffsetRef.current, 'none')
+      })
+    },
+    [setHomeTrackTransform],
+  )
+
+  const settleHomeTrack = useCallback(
+    (index: number) => {
+      cancelNavRaf()
+      setHomeTrackTransform(index, 0, NAV_TRACK_TRANSITION)
+    },
+    [cancelNavRaf, setHomeTrackTransform],
+  )
 
   useLayoutEffect(() => {
     activeIndexRef.current = activeIndex
@@ -131,9 +170,10 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
       const start = navSwipeStartRef.current
       navSwipeStartRef.current = null
       unlockHorizontalSwipeScroll()
-      setNavDragActive(false)
-      setNavDragOffsetPx(0)
-      if (!start) return
+      if (!start) {
+        settleHomeTrack(activeIndexRef.current)
+        return
+      }
       if (start.dragging) {
         ignoreHomeClickRef.current = true
         window.setTimeout(() => {
@@ -145,12 +185,19 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
       const dy = clientY - start.y
       const ax = Math.abs(dx)
       const ay = Math.abs(dy)
-      if (!start.dragging && (ax < NAV_SWIPE_COMMIT_PX || ax < ay * 1.08)) return
+      if (!start.dragging && (ax < NAV_SWIPE_COMMIT_PX || ax < ay * 1.08)) {
+        settleHomeTrack(start.activeIndex)
+        return
+      }
 
       const offset = dragOffsetFor(start, dx)
       const commitDistance = Math.max(NAV_SWIPE_COMMIT_PX, start.width * NAV_SWIPE_COMMIT_RATIO)
       const next = offset < -commitDistance ? start.activeIndex + 1 : offset > commitDistance ? start.activeIndex - 1 : start.activeIndex
-      if (next < 0 || next >= TAB_COUNT || next === start.activeIndex) return
+      if (next < 0 || next >= TAB_COUNT || next === start.activeIndex) {
+        settleHomeTrack(start.activeIndex)
+        return
+      }
+      settleHomeTrack(next)
       scrollToPanel(next)
     }
 
@@ -187,10 +234,10 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
         }
         start.dragging = true
         lockHorizontalSwipeScroll()
-        setNavDragActive(true)
+        setHomeTrackTransform(start.activeIndex, 0, 'none')
       }
       if (e.cancelable) e.preventDefault()
-      setNavDragOffsetPx(dragOffsetFor(start, dx))
+      scheduleHomeDragFrame(start.activeIndex, dragOffsetFor(start, dx))
     }
 
     const onPointerUpCapture = (e: PointerEvent) => {
@@ -199,10 +246,10 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
     }
 
     const onPointerCancelCapture = () => {
+      const index = navSwipeStartRef.current?.activeIndex ?? activeIndexRef.current
       navSwipeStartRef.current = null
       unlockHorizontalSwipeScroll()
-      setNavDragActive(false)
-      setNavDragOffsetPx(0)
+      settleHomeTrack(index)
     }
 
     window.addEventListener('pointerdown', onPointerDownCapture, true)
@@ -210,13 +257,14 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
     window.addEventListener('pointerup', onPointerUpCapture, true)
     window.addEventListener('pointercancel', onPointerCancelCapture, true)
     return () => {
+      cancelNavRaf()
       unlockHorizontalSwipeScroll()
       window.removeEventListener('pointerdown', onPointerDownCapture, true)
       window.removeEventListener('pointermove', onPointerMoveCapture, true)
       window.removeEventListener('pointerup', onPointerUpCapture, true)
       window.removeEventListener('pointercancel', onPointerCancelCapture, true)
     }
-  }, [scrollToPanel])
+  }, [cancelNavRaf, scheduleHomeDragFrame, scrollToPanel, setHomeTrackTransform, settleHomeTrack])
 
   const navLabels = useMemo(
     () => [
@@ -259,17 +307,14 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
     return hits
   }, [debouncedQuery, grenadesByMap, lang, positionCatalog, t])
 
-  const panelWidthPercent = 100 / TAB_COUNT
   const homeTrackStyle = useMemo(
     () => ({
       width: `${TAB_COUNT * 100}%`,
-      transform: `translate3d(calc(${-activeIndex * panelWidthPercent}% + ${navDragOffsetPx}px), 0, 0)`,
-      transition: navDragActive
-        ? 'none'
-        : 'transform 320ms cubic-bezier(0.22, 0.72, 0.18, 1)',
+      transform: `translate3d(${-activeIndex * panelWidthPercent}%, 0, 0)`,
+      transition: NAV_TRACK_TRANSITION,
       willChange: 'transform',
     }),
-    [activeIndex, navDragActive, navDragOffsetPx, panelWidthPercent],
+    [activeIndex, panelWidthPercent],
   )
   const homePanelStyle = useMemo(
     () => ({ width: `${panelWidthPercent}%` }),
@@ -288,7 +333,7 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
           e.stopPropagation()
         }}
       >
-        <div className="flex h-full min-h-0 shrink-0" style={homeTrackStyle}>
+        <div ref={homeTrackRef} className="flex h-full min-h-0 shrink-0" style={homeTrackStyle}>
         <section className="flex h-full min-h-0 shrink-0 grow-0 flex-col" style={homePanelStyle} aria-hidden={activeIndex !== 0}>
             <div className="no-scrollbar min-h-0 w-full max-w-full flex-1 overflow-y-auto overscroll-y-contain px-app-screen pt-3 pb-[calc(8.1rem+env(safe-area-inset-bottom,0px))] [-webkit-overflow-scrolling:touch]">
             <div className="relative">
