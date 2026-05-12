@@ -23,55 +23,6 @@ type Props = {
   onClick: (e: React.MouseEvent) => void
 }
 
-function MarkerShapeOutline({ type, color }: { type: GrenadeType; color: string }) {
-  const strokeWidth = 2.4
-
-  switch (type) {
-    case 'flash':
-      return (
-        <polygon
-          points="12 2.5 21.5 12 12 21.5 2.5 12"
-          fill="none"
-          stroke={color}
-          strokeWidth={strokeWidth}
-          strokeLinejoin="round"
-        />
-      )
-    case 'molotov':
-      return (
-        <polygon
-          points="12 3 21 20.5 3 20.5"
-          fill="none"
-          stroke={color}
-          strokeWidth={strokeWidth}
-          strokeLinejoin="round"
-        />
-      )
-    case 'he':
-      return (
-        <polygon
-          points="12 2.5 20.5 7.5 20.5 16.5 12 21.5 3.5 16.5 3.5 7.5"
-          fill="none"
-          stroke={color}
-          strokeWidth={strokeWidth}
-          strokeLinejoin="round"
-        />
-      )
-    case 'smoke':
-    default:
-      return (
-        <circle
-          cx="12"
-          cy="12"
-          r="9.5"
-          fill="none"
-          stroke={color}
-          strokeWidth={strokeWidth}
-        />
-      )
-  }
-}
-
 const GRENADE_ICON_MASKS: Record<GrenadeType, string> = {
   flash: '/grenade-icons/flash.png',
   he: '/grenade-icons/he.png',
@@ -110,13 +61,6 @@ function MarkerFace({
 
   return (
     <div className={base} style={{ ...faceStyle, ...scaleWrap }}>
-      <svg
-        className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
-        viewBox="0 0 24 24"
-        aria-hidden
-      >
-        <MarkerShapeOutline type={type} color={outlineColor} />
-      </svg>
       <span
         className="pointer-events-none relative z-10 block"
         style={iconStyle}
