@@ -1,15 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Grenade } from '@/types'
 import { GRENADE_COLORS, GRENADE_LABELS, GRENADE_EMOJIS, DIFFICULTY_COLORS, DIFFICULTY_LABELS } from '@/lib/grenades'
 import { useT } from '@/i18n'
 import ThrowVariantOriginDock from './ThrowVariantOriginDock'
-import {
-  beginThrowVariantSwipeWindowTracking,
-  teardownThrowVariantSwipeWindow,
-} from '@/lib/throw-variant-swipe-window'
+import { teardownThrowVariantSwipeWindow } from '@/lib/throw-variant-swipe-window'
 
 interface Props {
   grenade: Grenade
@@ -54,6 +51,10 @@ const THROW_GUIDE_HINTS: Record<string, string> = {
   d_jumpthrow: 'Зажми D, затем одновременно левая кнопка и пробел.',
 }
 
+const VARIANT_SWIPE_START_PX = 8
+const VARIANT_SWIPE_COMMIT_PX = 36
+const VARIANT_SWIPE_COMMIT_RATIO = 0.22
+
 export default function BottomSheet({
   grenade,
   onClose,
@@ -69,6 +70,15 @@ export default function BottomSheet({
   const isDragging = useRef(false)
   const [showThrowGuide, setShowThrowGuide] = useState(false)
   const [portalReady, setPortalReady] = useState(false)
+  const [variantDragOffsetPx, setVariantDragOffsetPx] = useState(0)
+  const [variantDragActive, setVariantDragActive] = useState(false)
+  const variantSwipeStartRef = useRef<{
+    x: number
+    y: number
+    width: number
+    activeIndex: number
+    dragging: boolean
+  } | null>(null)
 
   const color = GRENADE_COLORS[grenade.type]
   const emoji = GRENADE_EMOJIS[grenade.type]
@@ -80,14 +90,9 @@ export default function BottomSheet({
   const vi = Math.min(Math.max(0, activeThrowVariantIndex), Math.max(0, variantCount - 1))
   const activeVar = variantCount > 0 ? variants[vi] : null
   const showVariantDock = variantCount > 1 && Boolean(onThrowVariantIndexChange)
-  const [variantMotion, setVariantMotion] = useState<'next' | 'prev'>('next')
   const mediaUrl = activeVar?.media_url ?? grenade.media_url
-  const gallery = (activeVar?.gallery_urls ?? grenade.gallery_urls)?.filter(Boolean) ?? []
-  const contentTransitionKey = `${grenade.id}:${vi}`
-  const contentTransitionClass =
-    variantMotion === 'prev'
-      ? 'throw-variant-content-enter-prev'
-      : 'throw-variant-content-enter-next'
+  const mediaPageCount = Math.max(variantCount, 1)
+  const mediaPageWidthPercent = 100 / mediaPageCount
   const throwType = activeVar?.throw_type ?? grenade.throw_type
   const variantDescription =
     activeVar?.description?.trim() && activeVar.description !== 'unused'
@@ -95,7 +100,6 @@ export default function BottomSheet({
       : ''
   const rootDescription =
     grenade.description && grenade.description !== 'unused' ? grenade.description : ''
-  const hasMediaBlock = Boolean(mediaUrl) || gallery.length > 0
   const throwLabel = THROW_LABELS[throwType] ?? throwType
   const throwGuideHint =
     activeVar?.method_hint?.trim() ||
@@ -146,26 +150,193 @@ export default function BottomSheet({
 
   const handleVariantIndexChange = useCallback(
     (next: number) => {
-      setVariantMotion(next < vi ? 'prev' : 'next')
+      setVariantDragActive(false)
+      setVariantDragOffsetPx(0)
       onThrowVariantIndexChange?.(next)
     },
-    [onThrowVariantIndexChange, vi],
+    [onThrowVariantIndexChange],
   )
 
-  const getMediaSwipeCtx = useCallback(
+  const variantMediaTrackStyle = useMemo(
     () => ({
-      count: variantCount,
-      activeIndex: vi,
-      onChange: handleVariantIndexChange,
+      width: `${mediaPageCount * 100}%`,
+      transform: `translate3d(calc(${-vi * mediaPageWidthPercent}% + ${variantDragOffsetPx}px), 0, 0)`,
+      transition: variantDragActive
+        ? 'none'
+        : 'transform 300ms cubic-bezier(0.22, 0.72, 0.18, 1)',
+      willChange: 'transform',
     }),
-    [variantCount, vi, handleVariantIndexChange],
+    [mediaPageCount, mediaPageWidthPercent, variantDragActive, variantDragOffsetPx, vi],
+  )
+  const variantMediaPanelStyle = useMemo(
+    () => ({ width: `${mediaPageWidthPercent}%` }),
+    [mediaPageWidthPercent],
+  )
+
+  const variantDragOffsetFor = useCallback((width: number, activeIndex: number, dx: number) => {
+    const hasPrev = activeIndex > 0
+    const hasNext = activeIndex < variantCount - 1
+    const edgeDamped = (dx > 0 && !hasPrev) || (dx < 0 && !hasNext)
+    const raw = edgeDamped ? dx * 0.28 : dx
+    return Math.max(-width, Math.min(width, raw))
+  }, [variantCount])
+
+  const finishVariantSwipe = useCallback(
+    (clientX: number, clientY: number) => {
+      const start = variantSwipeStartRef.current
+      variantSwipeStartRef.current = null
+      setVariantDragActive(false)
+      setVariantDragOffsetPx(0)
+      if (!start) return
+
+      const dx = clientX - start.x
+      const dy = clientY - start.y
+      const ax = Math.abs(dx)
+      const ay = Math.abs(dy)
+      if (!start.dragging && (ax < VARIANT_SWIPE_COMMIT_PX || ax < ay * 1.08)) return
+
+      const offset = variantDragOffsetFor(start.width, start.activeIndex, dx)
+      const commitDistance = Math.max(VARIANT_SWIPE_COMMIT_PX, start.width * VARIANT_SWIPE_COMMIT_RATIO)
+      const next =
+        offset < -commitDistance
+          ? start.activeIndex + 1
+          : offset > commitDistance
+            ? start.activeIndex - 1
+            : start.activeIndex
+      if (next < 0 || next >= variantCount || next === start.activeIndex) return
+      handleVariantIndexChange(next)
+    },
+    [handleVariantIndexChange, variantCount, variantDragOffsetFor],
   )
 
   const onMediaBlockSwipeTouchStart = (e: React.TouchEvent) => {
     if (!showVariantDock || variantCount < 2) return
     if (e.touches.length !== 1) return
     const tch = e.touches[0]
-    beginThrowVariantSwipeWindowTracking(tch.identifier, tch.clientX, tch.clientY, getMediaSwipeCtx)
+    const el = e.currentTarget as HTMLElement
+    variantSwipeStartRef.current = {
+      x: tch.clientX,
+      y: tch.clientY,
+      width: Math.max(el.getBoundingClientRect().width, 1),
+      activeIndex: vi,
+      dragging: false,
+    }
+  }
+
+  const onMediaBlockSwipeTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return
+    const start = variantSwipeStartRef.current
+    if (!start) return
+
+    const tch = e.touches[0]
+    const dx = tch.clientX - start.x
+    const dy = tch.clientY - start.y
+    const ax = Math.abs(dx)
+    const ay = Math.abs(dy)
+    if (!start.dragging) {
+      if (ax < VARIANT_SWIPE_START_PX) return
+      if (ax < ay * 1.08) {
+        variantSwipeStartRef.current = null
+        return
+      }
+      start.dragging = true
+      setVariantDragActive(true)
+    }
+    e.preventDefault()
+    setVariantDragOffsetPx(variantDragOffsetFor(start.width, start.activeIndex, dx))
+  }
+
+  const onMediaBlockSwipeTouchEnd = (e: React.TouchEvent) => {
+    const changed = e.changedTouches[0]
+    if (!changed) {
+      variantSwipeStartRef.current = null
+      setVariantDragActive(false)
+      setVariantDragOffsetPx(0)
+      return
+    }
+    finishVariantSwipe(changed.clientX, changed.clientY)
+  }
+
+  const renderVariantMediaPanel = (variantIndex: number, compact: boolean) => {
+    const item = variantCount > 0 ? variants[variantIndex] : null
+    const itemMediaUrl = item?.media_url ?? grenade.media_url
+    const itemGallery = (item?.gallery_urls ?? grenade.gallery_urls)?.filter(Boolean) ?? []
+    const itemHasMediaBlock = Boolean(itemMediaUrl) || itemGallery.length > 0
+
+    if (!itemHasMediaBlock) {
+      return (
+        <div
+          className={`flex min-h-0 flex-1 flex-col items-center justify-center gap-2 rounded-2xl ${
+            compact ? 'mx-4 mb-3 gap-1.5' : 'mx-5 mb-4 aspect-video shrink-0'
+          } ${showVariantDock ? (compact ? 'pb-20' : 'mb-20') : ''}`}
+          style={{ background: '#242424', border: `1px dashed ${color}44` }}
+        >
+          <div className={compact ? 'text-3xl' : 'text-4xl'}>{emoji}</div>
+          <div className="text-[#555] text-sm">Нет видео и фото</div>
+          {!compact ? <div className="text-[#333] text-xs">Добавь в админке</div> : null}
+        </div>
+      )
+    }
+
+    return (
+      <div
+        ref={variantIndex === vi ? mediaScrollRef : undefined}
+        className={`min-h-0 flex-1 overflow-y-auto snap-y snap-mandatory bg-black/30 ${
+          compact ? '' : 'rounded-t-2xl'
+        } ${showVariantDock ? 'pb-20' : ''}`}
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
+        {itemMediaUrl && (
+          <section
+            className={
+              compact
+                ? 'snap-start flex h-full min-h-0 flex-col justify-start bg-black shrink-0'
+                : 'snap-start min-h-[min(72vh,520px)] flex flex-col justify-center bg-black shrink-0'
+            }
+          >
+            {!compact ? <p className="text-[10px] uppercase tracking-wider text-[#666] px-4 pt-2 pb-1">Видео</p> : null}
+            <video
+              ref={variantIndex === vi ? videoRef : undefined}
+              key={`${variantIndex}-${itemMediaUrl}`}
+              src={itemMediaUrl}
+              className={
+                compact
+                  ? 'h-full w-full min-h-0 flex-1 object-cover object-center bg-black md:object-contain'
+                  : 'h-[min(68vh,500px)] w-full object-cover bg-black md:object-contain'
+              }
+              playsInline
+              loop
+              muted
+              controls
+            />
+          </section>
+        )}
+        {itemGallery.map((url, i) => (
+          <section
+            key={`${variantIndex}-${url}-${i}`}
+            className={
+              compact
+                ? 'snap-start flex h-full min-h-0 flex-col justify-start px-2 pt-0.5 shrink-0'
+                : 'snap-start min-h-[min(60vh,420px)] flex flex-col justify-center px-2 py-3 shrink-0'
+            }
+          >
+            <p className={`text-[10px] uppercase tracking-wider text-[#666] px-2 pb-1 ${compact ? 'shrink-0' : ''}`}>
+              Фото {i + 1}{compact ? '/' : ' / '}{itemGallery.length}
+            </p>
+            <img
+              src={url}
+              alt=""
+              className={
+                compact
+                  ? 'h-full w-full min-h-0 flex-1 rounded-xl bg-[#111] object-cover object-center md:object-contain'
+                  : 'h-[min(58vh,400px)] w-full rounded-xl bg-[#111] object-cover md:object-contain'
+              }
+              loading="lazy"
+            />
+          </section>
+        ))}
+      </div>
+    )
   }
 
   useEffect(() => {
@@ -273,6 +444,13 @@ export default function BottomSheet({
         <div
           className="flex min-h-0 min-w-0 flex-1 flex-col"
           onTouchStart={onMediaBlockSwipeTouchStart}
+          onTouchMove={onMediaBlockSwipeTouchMove}
+          onTouchEnd={onMediaBlockSwipeTouchEnd}
+          onTouchCancel={() => {
+            variantSwipeStartRef.current = null
+            setVariantDragActive(false)
+            setVariantDragOffsetPx(0)
+          }}
         >
         {/* Компактный ряд: тип, заголовок, бросок/позиция, закрыть */}
         <div className="relative flex shrink-0 items-start gap-2 border-b border-[#262626]/90 px-app-screen pb-2 pt-2">
@@ -311,59 +489,19 @@ export default function BottomSheet({
           </p>
         )}
 
-        <div className="relative flex min-h-0 flex-1 flex-col">
-          {hasMediaBlock ? (
-            <div
-              key={contentTransitionKey}
-              ref={mediaScrollRef}
-              className={`throw-variant-content ${contentTransitionClass} min-h-0 flex-1 overflow-y-auto snap-y snap-mandatory bg-black/30 ${
-                showVariantDock ? 'pb-20' : ''
-              }`}
-              style={{ WebkitOverflowScrolling: 'touch' }}
-            >
-              {mediaUrl && (
-                <section className="snap-start flex h-full min-h-0 flex-col justify-start bg-black shrink-0">
-                  <video
-                    ref={videoRef}
-                    key={mediaUrl}
-                    src={mediaUrl}
-                    className="h-full w-full min-h-0 flex-1 object-cover object-center bg-black md:object-contain"
-                    playsInline
-                    loop
-                    muted
-                    controls
-                  />
-                </section>
-              )}
-              {gallery.map((url, i) => (
-                <section
-                  key={`${url}-${i}`}
-                  className="snap-start flex h-full min-h-0 flex-col justify-start px-2 pt-0.5 shrink-0"
-                >
-                  <p className="text-[10px] uppercase tracking-wider text-[#666] px-2 pb-1 shrink-0">
-                    Фото {i + 1}/{gallery.length}
-                  </p>
-                  <img
-                    src={url}
-                    alt=""
-                    className="h-full w-full min-h-0 flex-1 rounded-xl bg-[#111] object-cover object-center md:object-contain"
-                    loading="lazy"
-                  />
-                </section>
-              ))}
-            </div>
-          ) : (
-            <div
-              key={contentTransitionKey}
-              className={`throw-variant-content ${contentTransitionClass} flex min-h-0 flex-1 flex-col mx-4 mb-3 rounded-2xl items-center justify-center gap-1.5 ${
-                showVariantDock ? 'pb-20' : ''
-              }`}
-              style={{ background: '#242424', border: `1px dashed ${color}44` }}
-            >
-              <div className="text-3xl">{emoji}</div>
-              <div className="text-[#555] text-sm">Нет видео и фото</div>
-            </div>
-          )}
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="flex h-full min-h-0" style={variantMediaTrackStyle}>
+            {Array.from({ length: mediaPageCount }, (_, i) => (
+              <div
+                key={`${grenade.id}:panel:${i}`}
+                className="flex min-h-0 shrink-0 flex-col"
+                style={variantMediaPanelStyle}
+                aria-hidden={i !== vi}
+              >
+                {renderVariantMediaPanel(i, true)}
+              </div>
+            ))}
+          </div>
         </div>
         </div>
 
@@ -407,6 +545,13 @@ export default function BottomSheet({
         <div
           className="flex min-h-0 min-w-0 flex-1 flex-col"
           onTouchStart={onMediaBlockSwipeTouchStart}
+          onTouchMove={onMediaBlockSwipeTouchMove}
+          onTouchEnd={onMediaBlockSwipeTouchEnd}
+          onTouchCancel={() => {
+            variantSwipeStartRef.current = null
+            setVariantDragActive(false)
+            setVariantDragOffsetPx(0)
+          }}
         >
         <div className="relative flex shrink-0 items-start gap-2 border-b border-[#333]/80 px-5 pb-2 pt-1">
           <div className="min-w-0 flex-1 space-y-1">
@@ -450,64 +595,19 @@ export default function BottomSheet({
           </p>
         )}
 
-        <div className="relative flex min-h-0 flex-1 flex-col">
-          {hasMediaBlock && (
-            <div
-              key={contentTransitionKey}
-              ref={mediaScrollRef}
-              className={`throw-variant-content ${contentTransitionClass} min-h-0 flex-1 overflow-y-auto snap-y snap-mandatory rounded-t-2xl bg-black/30 ${
-                showVariantDock ? 'pb-20' : ''
-              }`}
-              style={{ WebkitOverflowScrolling: 'touch' }}
-            >
-              {mediaUrl && (
-                <section className="snap-start min-h-[min(72vh,520px)] flex flex-col justify-center bg-black shrink-0">
-                  <p className="text-[10px] uppercase tracking-wider text-[#666] px-4 pt-2 pb-1">Видео</p>
-                  <video
-                    ref={videoRef}
-                    key={mediaUrl}
-                    src={mediaUrl}
-                    className="h-[min(68vh,500px)] w-full object-cover bg-black md:object-contain"
-                    playsInline
-                    loop
-                    muted
-                    controls
-                  />
-                </section>
-              )}
-              {gallery.map((url, i) => (
-                <section
-                  key={`${url}-${i}`}
-                  className="snap-start min-h-[min(60vh,420px)] flex flex-col justify-center px-2 py-3 shrink-0"
-                >
-                  <p className="text-[10px] uppercase tracking-wider text-[#666] px-2 pb-1">
-                    Фото {i + 1} / {gallery.length}
-                  </p>
-                  <img
-                    src={url}
-                    alt=""
-                    className="h-[min(58vh,400px)] w-full rounded-xl bg-[#111] object-cover md:object-contain"
-                    loading="lazy"
-                  />
-                </section>
-              ))}
-            </div>
-          )}
-
-          {!hasMediaBlock && (
-            <div
-              key={contentTransitionKey}
-              className={`throw-variant-content ${contentTransitionClass} mx-5 mb-4 flex aspect-video shrink-0 flex-col items-center justify-center gap-2 rounded-2xl ${
-                showVariantDock ? 'mb-20' : ''
-              }`}
-              style={{ background: '#242424', border: `1px dashed ${color}44` }}
-            >
-              <div className="text-4xl">{emoji}</div>
-              <div className="text-[#555] text-sm">Нет видео и фото</div>
-              <div className="text-[#333] text-xs">Добавь в админке</div>
-            </div>
-          )}
-        </div>
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="flex h-full min-h-0" style={variantMediaTrackStyle}>
+            {Array.from({ length: mediaPageCount }, (_, i) => (
+              <div
+                key={`${grenade.id}:panel:${i}`}
+                className="flex min-h-0 shrink-0 flex-col"
+                style={variantMediaPanelStyle}
+                aria-hidden={i !== vi}
+              >
+                {renderVariantMediaPanel(i, false)}
+              </div>
+            ))}
+          </div>
         </div>
 
         {showVariantDock && onThrowVariantIndexChange && (
@@ -520,7 +620,8 @@ export default function BottomSheet({
           />
         )}
       </div>
+      </div>
       {throwGuidePortal}
-    </>
-  )
-}
+      </>
+    )
+  }

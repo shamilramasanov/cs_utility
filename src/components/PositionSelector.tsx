@@ -21,6 +21,10 @@ export interface PositionNavigationLinks {
 
 const TAB_KEYS = ['map', 'photos', 'list'] as const
 type PickerTabKey = (typeof TAB_KEYS)[number]
+const TAB_COUNT = TAB_KEYS.length
+const NAV_SWIPE_START_PX = 8
+const NAV_SWIPE_COMMIT_PX = 36
+const NAV_SWIPE_COMMIT_RATIO = 0.22
 
 interface Props {
   map: MapData
@@ -79,7 +83,7 @@ function PickerNavIconImg({ index, active }: { index: 0 | 1 | 2; active: boolean
 
 /**
  * Карта + фильтры; вкладки «Карточки / Список» переключаются, но без старого тяжёлого контента
- * (никакой горизонтальной карусели — только одна активная панель, без мигания соседних карточек).
+ * через лёгкий горизонтальный трек, чтобы свайп показывал соседний экран уже во время движения пальца.
  */
 export default function PositionSelector({
   map,
@@ -171,33 +175,18 @@ export default function PositionSelector({
     panelIndexRef.current = panelIndex
   }, [panelIndex])
 
-  const navSwipeStartRef = useRef<{ x: number; y: number } | null>(null)
+  const [navDragOffsetPx, setNavDragOffsetPx] = useState(0)
+  const [navDragActive, setNavDragActive] = useState(false)
+  const navSwipeStartRef = useRef<{
+    x: number
+    y: number
+    panelIndex: number
+    width: number
+    dragging: boolean
+  } | null>(null)
   const ignoreNavTabClicksRef = useRef(false)
   /** Синхронно с MapView: при зуме > 1 свайп по карте не переключает вкладки (пан/пинч). */
   const mapPickerZoomRef = useRef(1)
-
-  const applyNavSwipe = useCallback(
-    (clientX: number, clientY: number) => {
-      const start = navSwipeStartRef.current
-      navSwipeStartRef.current = null
-      if (!start) return
-      const dx = clientX - start.x
-      const dy = clientY - start.y
-      const ax = Math.abs(dx)
-      const ay = Math.abs(dy)
-      if (ax < 36) return
-      if (ax < ay * 1.08) return
-      const i = panelIndexRef.current
-      const next = dx < 0 ? i + 1 : i - 1
-      if (next < 0 || next > 2 || next === i) return
-      ignoreNavTabClicksRef.current = true
-      window.setTimeout(() => {
-        ignoreNavTabClicksRef.current = false
-      }, 400)
-      setPanelIndex(next)
-    },
-    [setPanelIndex],
-  )
 
   useEffect(() => {
     const swipeExcluded = (target: EventTarget | null) => {
@@ -208,30 +197,92 @@ export default function PositionSelector({
       }
       return false
     }
+    const dragOffsetFor = (start: NonNullable<typeof navSwipeStartRef.current>, dx: number) => {
+      const hasPrev = start.panelIndex > 0
+      const hasNext = start.panelIndex < TAB_COUNT - 1
+      const edgeDamped = (dx > 0 && !hasPrev) || (dx < 0 && !hasNext)
+      const raw = edgeDamped ? dx * 0.28 : dx
+      return Math.max(-start.width, Math.min(start.width, raw))
+    }
+    const finishNavSwipe = (clientX: number, clientY: number) => {
+      const start = navSwipeStartRef.current
+      navSwipeStartRef.current = null
+      setNavDragActive(false)
+      setNavDragOffsetPx(0)
+      if (!start) return
+
+      const dx = clientX - start.x
+      const dy = clientY - start.y
+      const ax = Math.abs(dx)
+      const ay = Math.abs(dy)
+      if (!start.dragging && (ax < NAV_SWIPE_COMMIT_PX || ax < ay * 1.08)) return
+
+      const offset = dragOffsetFor(start, dx)
+      const commitDistance = Math.max(NAV_SWIPE_COMMIT_PX, start.width * NAV_SWIPE_COMMIT_RATIO)
+      const next = offset < -commitDistance ? start.panelIndex + 1 : offset > commitDistance ? start.panelIndex - 1 : start.panelIndex
+      if (next < 0 || next >= TAB_COUNT || next === start.panelIndex) return
+
+      ignoreNavTabClicksRef.current = true
+      window.setTimeout(() => {
+        ignoreNavTabClicksRef.current = false
+      }, 400)
+      setPanelIndex(next)
+    }
     const onPointerDownCapture = (e: PointerEvent) => {
       if (!e.isPrimary) return
       if (swipeExcluded(e.target)) {
         navSwipeStartRef.current = null
         return
       }
-      navSwipeStartRef.current = { x: e.clientX, y: e.clientY }
+      navSwipeStartRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        panelIndex: panelIndexRef.current,
+        width: Math.max(window.innerWidth, 1),
+        dragging: false,
+      }
+    }
+    const onPointerMoveCapture = (e: PointerEvent) => {
+      if (!e.isPrimary) return
+      const start = navSwipeStartRef.current
+      if (!start) return
+
+      const dx = e.clientX - start.x
+      const dy = e.clientY - start.y
+      const ax = Math.abs(dx)
+      const ay = Math.abs(dy)
+      if (!start.dragging) {
+        if (ax < NAV_SWIPE_START_PX) return
+        if (ax < ay * 1.08) {
+          navSwipeStartRef.current = null
+          return
+        }
+        start.dragging = true
+        setNavDragActive(true)
+      }
+      if (e.cancelable) e.preventDefault()
+      setNavDragOffsetPx(dragOffsetFor(start, dx))
     }
     const onPointerUpCapture = (e: PointerEvent) => {
       if (!e.isPrimary) return
-      applyNavSwipe(e.clientX, e.clientY)
+      finishNavSwipe(e.clientX, e.clientY)
     }
     const onPointerCancelCapture = () => {
       navSwipeStartRef.current = null
+      setNavDragActive(false)
+      setNavDragOffsetPx(0)
     }
     window.addEventListener('pointerdown', onPointerDownCapture, true)
+    window.addEventListener('pointermove', onPointerMoveCapture, true)
     window.addEventListener('pointerup', onPointerUpCapture, true)
     window.addEventListener('pointercancel', onPointerCancelCapture, true)
     return () => {
       window.removeEventListener('pointerdown', onPointerDownCapture, true)
+      window.removeEventListener('pointermove', onPointerMoveCapture, true)
       window.removeEventListener('pointerup', onPointerUpCapture, true)
       window.removeEventListener('pointercancel', onPointerCancelCapture, true)
     }
-  }, [applyNavSwipe])
+  }, [setPanelIndex])
 
   const pickerFiltersAnchorRef = useRef<HTMLDivElement>(null)
   const [lineupOverlayTopPx, setLineupOverlayTopPx] = useState(0)
@@ -321,6 +372,23 @@ export default function PositionSelector({
     setActiveThrowVariantIndex(idx)
   }, [])
 
+  const panelWidthPercent = 100 / TAB_COUNT
+  const navTrackStyle = useMemo(
+    () => ({
+      width: `${TAB_COUNT * 100}%`,
+      transform: `translate3d(calc(${-panelIndex * panelWidthPercent}% + ${navDragOffsetPx}px), 0, 0)`,
+      transition: navDragActive
+        ? 'none'
+        : 'transform 320ms cubic-bezier(0.22, 0.72, 0.18, 1)',
+      willChange: 'transform',
+    }),
+    [navDragActive, navDragOffsetPx, panelIndex, panelWidthPercent],
+  )
+  const navPanelStyle = useMemo(
+    () => ({ width: `${panelWidthPercent}%` }),
+    [panelWidthPercent],
+  )
+
   return (
     <div className="relative flex h-full min-h-0 flex-col bg-[#0d0d0d]">
       <div ref={pickerFiltersAnchorRef} className="shrink-0">
@@ -345,68 +413,85 @@ export default function PositionSelector({
       </div>
 
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <div className="relative flex min-h-0 flex-1 flex-col px-app-screen pt-1 pb-[max(5.5rem,env(safe-area-inset-bottom,0px)+4.5rem)]">
-          {panelIndex === 0 && (
-            <div
-              className="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-[#262626] bg-[#121212]"
-              role="region"
-              aria-label={map.display_name}
+        <div
+          className="relative flex min-h-0 flex-1 flex-col overflow-hidden px-app-screen pt-1 pb-[max(5.5rem,env(safe-area-inset-bottom,0px)+4.5rem)]"
+          style={{ touchAction: 'pan-y' }}
+        >
+          <div className="flex h-full min-h-0" style={navTrackStyle}>
+            <section
+              className="flex min-h-0 shrink-0 flex-col"
+              style={navPanelStyle}
+              aria-hidden={panelIndex !== 0}
             >
-              <MapView
-                mapTitle={map.display_name}
-                onZoomChange={handleMapZoomChange}
-                radarFile={currentLayer.file}
-                grenades={mapGrenades}
-                previewGrenade={mapPreviewGrenade}
-                onPreviewChange={setMapPreviewGrenade}
-                selectedGrenade={selectedGrenade}
-                onSelect={setSelectedGrenade}
-                onThrowVariantSelect={handleMapThrowVariantSelect}
-                imagePosition={selectedGrenade ? 'top' : 'center'}
-                displaySide={pickerTeam === 'any' ? undefined : pickerTeam}
-                activeThrowVariantIndex={activeThrowVariantIndex}
-              />
-              {selectedGrenade && <div className="pointer-events-none absolute inset-0 bg-black/18" />}
-            </div>
-          )}
-
-          {panelIndex === 1 && (
-            <div
-              className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#262626] bg-[#121212]"
-              role="region"
-              aria-label={t('position.tab.photos')}
-            >
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                <PositionPhotoGrid
-                  positions={rootPositions}
+              <div
+                className="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-[#262626] bg-[#121212]"
+                role="region"
+                aria-label={map.display_name}
+              >
+                <MapView
+                  mapTitle={map.display_name}
+                  onZoomChange={handleMapZoomChange}
+                  radarFile={currentLayer.file}
                   grenades={mapGrenades}
-                  positionCatalog={catalog}
-                  onPick={onPick}
-                  pickHref={pickHref}
-                  hideEmpty={nadeFilter !== 'all'}
+                  previewGrenade={mapPreviewGrenade}
+                  onPreviewChange={setMapPreviewGrenade}
+                  selectedGrenade={selectedGrenade}
+                  onSelect={setSelectedGrenade}
+                  onThrowVariantSelect={handleMapThrowVariantSelect}
+                  imagePosition={selectedGrenade ? 'top' : 'center'}
+                  displaySide={pickerTeam === 'any' ? undefined : pickerTeam}
+                  activeThrowVariantIndex={activeThrowVariantIndex}
                 />
+                {selectedGrenade && <div className="pointer-events-none absolute inset-0 bg-black/18" />}
               </div>
-            </div>
-          )}
+            </section>
 
-          {panelIndex === 2 && (
-            <div
-              className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#262626] bg-[#121212]"
-              role="region"
-              aria-label={t('position.tab.list')}
+            <section
+              className="flex min-h-0 shrink-0 flex-col"
+              style={navPanelStyle}
+              aria-hidden={panelIndex !== 1}
             >
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                <PositionPickerList
-                  positions={rootPositions}
-                  grenades={mapGrenades}
-                  positionCatalog={catalog}
-                  onPick={onPick}
-                  pickHref={pickHref}
-                  hideEmpty={nadeFilter !== 'all'}
-                />
+              <div
+                className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#262626] bg-[#121212]"
+                role="region"
+                aria-label={t('position.tab.photos')}
+              >
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                  <PositionPhotoGrid
+                    positions={rootPositions}
+                    grenades={mapGrenades}
+                    positionCatalog={catalog}
+                    onPick={onPick}
+                    pickHref={pickHref}
+                    hideEmpty={nadeFilter !== 'all'}
+                  />
+                </div>
               </div>
-            </div>
-          )}
+            </section>
+
+            <section
+              className="flex min-h-0 shrink-0 flex-col"
+              style={navPanelStyle}
+              aria-hidden={panelIndex !== 2}
+            >
+              <div
+                className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#262626] bg-[#121212]"
+                role="region"
+                aria-label={t('position.tab.list')}
+              >
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                  <PositionPickerList
+                    positions={rootPositions}
+                    grenades={mapGrenades}
+                    positionCatalog={catalog}
+                    onPick={onPick}
+                    pickHref={pickHref}
+                    hideEmpty={nadeFilter !== 'all'}
+                  />
+                </div>
+              </div>
+            </section>
+          </div>
         </div>
       </div>
 

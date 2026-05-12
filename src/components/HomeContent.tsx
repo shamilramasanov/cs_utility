@@ -27,6 +27,9 @@ import { PositionPhotoCard } from '@/components/PositionPhotoGrid'
 import { APP_SEARCH_ICON_SRC, SearchInputLeadingIcon } from '@/components/SearchInputLeadingIcon'
 
 const TAB_COUNT = 4
+const NAV_SWIPE_START_PX = 8
+const NAV_SWIPE_COMMIT_PX = 36
+const NAV_SWIPE_COMMIT_RATIO = 0.22
 /** Иконки нижней навигации — `public/nav/*.png` */
 const NAV_ICON_SRC = [
   APP_SEARCH_ICON_SRC,
@@ -60,8 +63,23 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
   const trackRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [activeIndex, setActiveIndex] = useState(1)
+  const activeIndexRef = useRef(activeIndex)
+  const [navDragOffsetPx, setNavDragOffsetPx] = useState(0)
+  const [navDragActive, setNavDragActive] = useState(false)
+  const navSwipeStartRef = useRef<{
+    x: number
+    y: number
+    activeIndex: number
+    width: number
+    dragging: boolean
+  } | null>(null)
+  const ignoreHomeClickRef = useRef(false)
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
+
+  useLayoutEffect(() => {
+    activeIndexRef.current = activeIndex
+  }, [activeIndex])
 
   useEffect(() => {
     const id = window.setTimeout(() => setDebouncedQuery(query.trim()), 140)
@@ -69,8 +87,6 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
   }, [query])
 
   useLayoutEffect(() => {
-    const el = trackRef.current
-    if (!el) return
     let restoreSearch = false
     let savedQuery = ''
     try {
@@ -83,32 +99,17 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
     } catch {
       /* private mode / quota */
     }
-    const apply = () => {
-      const w = el.clientWidth
-      if (!w) {
-        requestAnimationFrame(apply)
-        return
-      }
-      const panel = restoreSearch ? 0 : 1
-      el.scrollLeft = w * panel
-      setActiveIndex(panel)
-      if (restoreSearch) {
-        setQuery(savedQuery)
-        setDebouncedQuery(savedQuery.trim())
-        requestAnimationFrame(() => searchInputRef.current?.focus())
-      }
+    const panel = restoreSearch ? 0 : 1
+    setActiveIndex(panel)
+    if (restoreSearch) {
+      setQuery(savedQuery)
+      setDebouncedQuery(savedQuery.trim())
+      requestAnimationFrame(() => searchInputRef.current?.focus())
     }
-    apply()
   }, [])
 
   const scrollToPanel = useCallback((index: number) => {
-    const el = trackRef.current
-    if (!el) return
-    const w = el.clientWidth
-    if (!w) return
     const i = Math.max(0, Math.min(TAB_COUNT - 1, index))
-    /** Без smooth — иначе debounce snap и scroll дают подёргивание при клике. */
-    el.scrollLeft = i * w
     setActiveIndex(i)
     if (i === 0) {
       // Сразу в обработчике tap — иначе iOS/Android не показывают клавиатуру после setTimeout/rAF
@@ -116,53 +117,101 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
     }
   }, [])
 
-  const snapToNearestPage = useCallback(() => {
-    const el = trackRef.current
-    if (!el) return
-    const w = el.clientWidth
-    if (!w) return
-    const idx = Math.round(el.scrollLeft / w)
-    const clamped = Math.max(0, Math.min(TAB_COUNT - 1, idx))
-    const target = clamped * w
-    if (Math.abs(el.scrollLeft - target) < 1) {
-      setActiveIndex(clamped)
-      return
-    }
-    el.scrollTo({ left: target, behavior: 'auto' })
-    setActiveIndex(clamped)
-  }, [])
-
   useEffect(() => {
-    const el = trackRef.current
-    if (!el) return
-    let raf = 0
-    let debounceTimer = 0
-
-    const onScroll = () => {
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => {
-        const w = el.clientWidth || 1
-        const i = Math.round(el.scrollLeft / w)
-        setActiveIndex(Math.max(0, Math.min(TAB_COUNT - 1, i)))
-      })
-      window.clearTimeout(debounceTimer)
-      debounceTimer = window.setTimeout(() => snapToNearestPage(), 280)
+    const dragOffsetFor = (start: NonNullable<typeof navSwipeStartRef.current>, dx: number) => {
+      const hasPrev = start.activeIndex > 0
+      const hasNext = start.activeIndex < TAB_COUNT - 1
+      const edgeDamped = (dx > 0 && !hasPrev) || (dx < 0 && !hasNext)
+      const raw = edgeDamped ? dx * 0.28 : dx
+      return Math.max(-start.width, Math.min(start.width, raw))
     }
 
-    const onScrollEnd = () => {
-      window.clearTimeout(debounceTimer)
-      snapToNearestPage()
+    const finishNavSwipe = (clientX: number, clientY: number) => {
+      const start = navSwipeStartRef.current
+      navSwipeStartRef.current = null
+      setNavDragActive(false)
+      setNavDragOffsetPx(0)
+      if (!start) return
+      if (start.dragging) {
+        ignoreHomeClickRef.current = true
+        window.setTimeout(() => {
+          ignoreHomeClickRef.current = false
+        }, 400)
+      }
+
+      const dx = clientX - start.x
+      const dy = clientY - start.y
+      const ax = Math.abs(dx)
+      const ay = Math.abs(dy)
+      if (!start.dragging && (ax < NAV_SWIPE_COMMIT_PX || ax < ay * 1.08)) return
+
+      const offset = dragOffsetFor(start, dx)
+      const commitDistance = Math.max(NAV_SWIPE_COMMIT_PX, start.width * NAV_SWIPE_COMMIT_RATIO)
+      const next = offset < -commitDistance ? start.activeIndex + 1 : offset > commitDistance ? start.activeIndex - 1 : start.activeIndex
+      if (next < 0 || next >= TAB_COUNT || next === start.activeIndex) return
+      scrollToPanel(next)
     }
 
-    el.addEventListener('scroll', onScroll, { passive: true })
-    el.addEventListener('scrollend', onScrollEnd as EventListener)
+    const onPointerDownCapture = (e: PointerEvent) => {
+      if (!e.isPrimary) return
+      if (e.target instanceof Element && e.target.closest('[data-home-global-swipe-ignore]')) {
+        navSwipeStartRef.current = null
+        return
+      }
+      const width = trackRef.current?.clientWidth || window.innerWidth || 1
+      navSwipeStartRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        activeIndex: activeIndexRef.current,
+        width,
+        dragging: false,
+      }
+    }
+
+    const onPointerMoveCapture = (e: PointerEvent) => {
+      if (!e.isPrimary) return
+      const start = navSwipeStartRef.current
+      if (!start) return
+
+      const dx = e.clientX - start.x
+      const dy = e.clientY - start.y
+      const ax = Math.abs(dx)
+      const ay = Math.abs(dy)
+      if (!start.dragging) {
+        if (ax < NAV_SWIPE_START_PX) return
+        if (ax < ay * 1.08) {
+          navSwipeStartRef.current = null
+          return
+        }
+        start.dragging = true
+        setNavDragActive(true)
+      }
+      if (e.cancelable) e.preventDefault()
+      setNavDragOffsetPx(dragOffsetFor(start, dx))
+    }
+
+    const onPointerUpCapture = (e: PointerEvent) => {
+      if (!e.isPrimary) return
+      finishNavSwipe(e.clientX, e.clientY)
+    }
+
+    const onPointerCancelCapture = () => {
+      navSwipeStartRef.current = null
+      setNavDragActive(false)
+      setNavDragOffsetPx(0)
+    }
+
+    window.addEventListener('pointerdown', onPointerDownCapture, true)
+    window.addEventListener('pointermove', onPointerMoveCapture, true)
+    window.addEventListener('pointerup', onPointerUpCapture, true)
+    window.addEventListener('pointercancel', onPointerCancelCapture, true)
     return () => {
-      cancelAnimationFrame(raf)
-      window.clearTimeout(debounceTimer)
-      el.removeEventListener('scroll', onScroll)
-      el.removeEventListener('scrollend', onScrollEnd as EventListener)
+      window.removeEventListener('pointerdown', onPointerDownCapture, true)
+      window.removeEventListener('pointermove', onPointerMoveCapture, true)
+      window.removeEventListener('pointerup', onPointerUpCapture, true)
+      window.removeEventListener('pointercancel', onPointerCancelCapture, true)
     }
-  }, [snapToNearestPage])
+  }, [scrollToPanel])
 
   const navLabels = useMemo(
     () => [
@@ -205,14 +254,37 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
     return hits
   }, [debouncedQuery, grenadesByMap, lang, positionCatalog, t])
 
+  const panelWidthPercent = 100 / TAB_COUNT
+  const homeTrackStyle = useMemo(
+    () => ({
+      width: `${TAB_COUNT * 100}%`,
+      transform: `translate3d(calc(${-activeIndex * panelWidthPercent}% + ${navDragOffsetPx}px), 0, 0)`,
+      transition: navDragActive
+        ? 'none'
+        : 'transform 320ms cubic-bezier(0.22, 0.72, 0.18, 1)',
+      willChange: 'transform',
+    }),
+    [activeIndex, navDragActive, navDragOffsetPx, panelWidthPercent],
+  )
+  const homePanelStyle = useMemo(
+    () => ({ width: `${panelWidthPercent}%` }),
+    [panelWidthPercent],
+  )
+
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col bg-[#0d0d0d]">
       <div
         ref={trackRef}
-        className="flex min-h-0 w-full min-w-0 max-w-full flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        style={{ touchAction: 'pan-x' }}
+        className="flex min-h-0 w-full min-w-0 max-w-full flex-1 overflow-hidden"
+        style={{ touchAction: 'pan-y' }}
+        onClickCapture={(e) => {
+          if (!ignoreHomeClickRef.current) return
+          e.preventDefault()
+          e.stopPropagation()
+        }}
       >
-        <section className="flex h-full min-h-0 w-full shrink-0 grow-0 basis-full snap-start snap-always flex-col">
+        <div className="flex h-full min-h-0 shrink-0" style={homeTrackStyle}>
+        <section className="flex h-full min-h-0 shrink-0 grow-0 flex-col" style={homePanelStyle} aria-hidden={activeIndex !== 0}>
             <div className="min-h-0 w-full max-w-full flex-1 overflow-y-auto overscroll-y-contain px-app-screen pt-3 pb-[calc(8.1rem+env(safe-area-inset-bottom,0px))] [-webkit-overflow-scrolling:touch]">
             <div className="relative">
               <input
@@ -282,7 +354,7 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
           </div>
         </section>
 
-        <section className="flex h-full min-h-0 w-full shrink-0 grow-0 basis-full snap-start snap-always flex-col">
+        <section className="flex h-full min-h-0 shrink-0 grow-0 flex-col" style={homePanelStyle} aria-hidden={activeIndex !== 1}>
             <div className="min-h-0 w-full max-w-full flex-1 overflow-y-auto overscroll-y-contain px-app-screen pt-3 pb-[calc(8.1rem+env(safe-area-inset-bottom,0px))] [-webkit-overflow-scrolling:touch]">
             <div className="grid grid-cols-2 gap-3">
               {mapsWithCounts.map(({ map, grenadeCount }, idx) => (
@@ -325,7 +397,7 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
           </div>
         </section>
 
-        <section className="flex h-full min-h-0 w-full shrink-0 grow-0 basis-full snap-start snap-always flex-col">
+        <section className="flex h-full min-h-0 shrink-0 grow-0 flex-col" style={homePanelStyle} aria-hidden={activeIndex !== 2}>
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-app-screen pb-[calc(8.1rem+env(safe-area-inset-bottom,0px))] pt-8 text-center">
             <span className="mb-3 text-4xl" aria-hidden>
               ⚡
@@ -337,7 +409,7 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
           </div>
         </section>
 
-        <section className="flex h-full min-h-0 w-full shrink-0 grow-0 basis-full snap-start snap-always flex-col">
+        <section className="flex h-full min-h-0 shrink-0 grow-0 flex-col" style={homePanelStyle} aria-hidden={activeIndex !== 3}>
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-app-screen pb-[calc(8.1rem+env(safe-area-inset-bottom,0px))] pt-8 text-center">
             <span className="mb-3 text-4xl" aria-hidden>
               ✨
@@ -348,6 +420,7 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
             </p>
           </div>
         </section>
+        </div>
       </div>
 
       <nav
