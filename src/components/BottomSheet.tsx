@@ -7,6 +7,7 @@ import { GRENADE_COLORS, GRENADE_LABELS, GRENADE_EMOJIS, DIFFICULTY_COLORS, DIFF
 import { useT } from '@/i18n'
 import ThrowVariantOriginDock from './ThrowVariantOriginDock'
 import { teardownThrowVariantSwipeWindow } from '@/lib/throw-variant-swipe-window'
+import { lockHorizontalSwipeScroll, unlockHorizontalSwipeScroll } from '@/lib/horizontal-swipe-scroll-lock'
 
 interface Props {
   grenade: Grenade
@@ -146,7 +147,13 @@ export default function BottomSheet({
     setPortalReady(true)
   }, [])
 
-  useEffect(() => () => teardownThrowVariantSwipeWindow(), [])
+  useEffect(
+    () => () => {
+      unlockHorizontalSwipeScroll()
+      teardownThrowVariantSwipeWindow()
+    },
+    [],
+  )
 
   const handleVariantIndexChange = useCallback(
     (next: number) => {
@@ -185,6 +192,7 @@ export default function BottomSheet({
     (clientX: number, clientY: number) => {
       const start = variantSwipeStartRef.current
       variantSwipeStartRef.current = null
+      unlockHorizontalSwipeScroll()
       setVariantDragActive(false)
       setVariantDragOffsetPx(0)
       if (!start) return
@@ -240,6 +248,7 @@ export default function BottomSheet({
         return
       }
       start.dragging = true
+      lockHorizontalSwipeScroll()
       setVariantDragActive(true)
     }
     e.preventDefault()
@@ -250,6 +259,7 @@ export default function BottomSheet({
     const changed = e.changedTouches[0]
     if (!changed) {
       variantSwipeStartRef.current = null
+      unlockHorizontalSwipeScroll()
       setVariantDragActive(false)
       setVariantDragOffsetPx(0)
       return
@@ -281,7 +291,7 @@ export default function BottomSheet({
     return (
       <div
         ref={variantIndex === vi ? mediaScrollRef : undefined}
-        className={`min-h-0 flex-1 overflow-y-auto snap-y snap-mandatory bg-black/30 ${
+        className={`no-scrollbar min-h-0 flex-1 overflow-y-auto snap-y snap-mandatory bg-black/30 ${
           compact ? '' : 'rounded-t-2xl'
         } ${showVariantDock ? 'pb-20' : ''}`}
         style={{ WebkitOverflowScrolling: 'touch' }}
@@ -448,6 +458,7 @@ export default function BottomSheet({
           onTouchEnd={onMediaBlockSwipeTouchEnd}
           onTouchCancel={() => {
             variantSwipeStartRef.current = null
+            unlockHorizontalSwipeScroll()
             setVariantDragActive(false)
             setVariantDragOffsetPx(0)
           }}
@@ -549,6 +560,7 @@ export default function BottomSheet({
           onTouchEnd={onMediaBlockSwipeTouchEnd}
           onTouchCancel={() => {
             variantSwipeStartRef.current = null
+            unlockHorizontalSwipeScroll()
             setVariantDragActive(false)
             setVariantDragOffsetPx(0)
           }}

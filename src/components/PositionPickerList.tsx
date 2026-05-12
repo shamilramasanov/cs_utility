@@ -98,7 +98,7 @@ export default function PositionPickerList({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-y-contain px-4 pb-4 [-webkit-overflow-scrolling:touch]">
+      <div className="no-scrollbar min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-y-contain px-4 pb-4 [-webkit-overflow-scrolling:touch]">
         {grouped.length === 0 ? (
           <div className="pt-10 text-center text-sm text-[#666]">{t('common.nothingFound')}</div>
         ) : (

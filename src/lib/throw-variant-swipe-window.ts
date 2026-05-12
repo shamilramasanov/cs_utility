@@ -3,6 +3,8 @@
  * Сессия вешает touchmove/touchend на window, чтобы жест не съедался вложенным скроллом.
  */
 
+import { lockHorizontalSwipeScroll, unlockHorizontalSwipeScroll } from './horizontal-swipe-scroll-lock'
+
 export const THROW_VARIANT_SWIPE_MIN_PX = 36
 
 export function isDominantHorizontalThrowVariantSwipe(dx: number, dy: number): boolean {
@@ -60,6 +62,7 @@ export function beginThrowVariantSwipeWindowTracking(
 
   let lastX = x0
   let lastY = y0
+  let scrollLocked = false
 
   const onMove = (ev: TouchEvent) => {
     for (let i = 0; i < ev.touches.length; i++) {
@@ -70,9 +73,17 @@ export function beginThrowVariantSwipeWindowTracking(
         break
       }
     }
+    if (!scrollLocked && isDominantHorizontalThrowVariantSwipe(lastX - x0, lastY - y0)) {
+      scrollLocked = true
+      lockHorizontalSwipeScroll()
+    }
   }
 
   const detach = () => {
+    if (scrollLocked) {
+      scrollLocked = false
+      unlockHorizontalSwipeScroll()
+    }
     window.removeEventListener('touchmove', onMove as EventListener)
     window.removeEventListener('touchend', onEnd as EventListener)
     window.removeEventListener('touchcancel', onCancel)

@@ -18,6 +18,7 @@ import { countGrenadesForPosition, pickPositionCardLineupPhoto } from '@/lib/pos
 import { getZoneIdForPositionOnSide } from '@/lib/position-zones'
 import type { SideKey } from '@/lib/side'
 import { isSideMatch } from '@/lib/side'
+import { lockHorizontalSwipeScroll, unlockHorizontalSwipeScroll } from '@/lib/horizontal-swipe-scroll-lock'
 import {
   pickLocalizedLabel,
   positionMatchesSearch,
@@ -129,6 +130,7 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
     const finishNavSwipe = (clientX: number, clientY: number) => {
       const start = navSwipeStartRef.current
       navSwipeStartRef.current = null
+      unlockHorizontalSwipeScroll()
       setNavDragActive(false)
       setNavDragOffsetPx(0)
       if (!start) return
@@ -184,6 +186,7 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
           return
         }
         start.dragging = true
+        lockHorizontalSwipeScroll()
         setNavDragActive(true)
       }
       if (e.cancelable) e.preventDefault()
@@ -197,6 +200,7 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
 
     const onPointerCancelCapture = () => {
       navSwipeStartRef.current = null
+      unlockHorizontalSwipeScroll()
       setNavDragActive(false)
       setNavDragOffsetPx(0)
     }
@@ -206,6 +210,7 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
     window.addEventListener('pointerup', onPointerUpCapture, true)
     window.addEventListener('pointercancel', onPointerCancelCapture, true)
     return () => {
+      unlockHorizontalSwipeScroll()
       window.removeEventListener('pointerdown', onPointerDownCapture, true)
       window.removeEventListener('pointermove', onPointerMoveCapture, true)
       window.removeEventListener('pointerup', onPointerUpCapture, true)
@@ -285,7 +290,7 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
       >
         <div className="flex h-full min-h-0 shrink-0" style={homeTrackStyle}>
         <section className="flex h-full min-h-0 shrink-0 grow-0 flex-col" style={homePanelStyle} aria-hidden={activeIndex !== 0}>
-            <div className="min-h-0 w-full max-w-full flex-1 overflow-y-auto overscroll-y-contain px-app-screen pt-3 pb-[calc(8.1rem+env(safe-area-inset-bottom,0px))] [-webkit-overflow-scrolling:touch]">
+            <div className="no-scrollbar min-h-0 w-full max-w-full flex-1 overflow-y-auto overscroll-y-contain px-app-screen pt-3 pb-[calc(8.1rem+env(safe-area-inset-bottom,0px))] [-webkit-overflow-scrolling:touch]">
             <div className="relative">
               <input
                 ref={searchInputRef}
@@ -355,7 +360,7 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
         </section>
 
         <section className="flex h-full min-h-0 shrink-0 grow-0 flex-col" style={homePanelStyle} aria-hidden={activeIndex !== 1}>
-            <div className="min-h-0 w-full max-w-full flex-1 overflow-y-auto overscroll-y-contain px-app-screen pt-3 pb-[calc(8.1rem+env(safe-area-inset-bottom,0px))] [-webkit-overflow-scrolling:touch]">
+            <div className="no-scrollbar min-h-0 w-full max-w-full flex-1 overflow-y-auto overscroll-y-contain px-app-screen pt-3 pb-[calc(8.1rem+env(safe-area-inset-bottom,0px))] [-webkit-overflow-scrolling:touch]">
             <div className="grid grid-cols-2 gap-3">
               {mapsWithCounts.map(({ map, grenadeCount }, idx) => (
                 <Link key={map.id} href={`/map/${map.id}`} prefetch>

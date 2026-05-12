@@ -109,7 +109,7 @@ export default function PositionPhotoGrid({
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain px-4 pb-0 space-y-5 [-webkit-overflow-scrolling:touch]">
+      <div className="no-scrollbar flex-1 min-h-0 overflow-y-auto overscroll-y-contain px-4 pb-0 space-y-5 [-webkit-overflow-scrolling:touch]">
         {grouped.length === 0 ? (
           <div className="text-center text-[#666] text-sm pt-10">
             {t('common.nothingFound')}

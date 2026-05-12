@@ -8,6 +8,7 @@ import type { Grenade, MapData } from '@/types'
 import type { MapPosition } from '@/types/positions'
 import { sideKeyToSide } from '@/lib/side'
 import { mergeGrenadesByDestination } from '@/lib/grenade-destinations'
+import { lockHorizontalSwipeScroll, unlockHorizontalSwipeScroll } from '@/lib/horizontal-swipe-scroll-lock'
 import BottomSheet from './BottomSheet'
 import PositionPhotoGrid from './PositionPhotoGrid'
 import PositionPickerFilterBar, { type PickerNadeFilter, type PickerTeamFilter } from './PositionPickerFilterBar'
@@ -207,6 +208,7 @@ export default function PositionSelector({
     const finishNavSwipe = (clientX: number, clientY: number) => {
       const start = navSwipeStartRef.current
       navSwipeStartRef.current = null
+      unlockHorizontalSwipeScroll()
       setNavDragActive(false)
       setNavDragOffsetPx(0)
       if (!start) return
@@ -258,6 +260,7 @@ export default function PositionSelector({
           return
         }
         start.dragging = true
+        lockHorizontalSwipeScroll()
         setNavDragActive(true)
       }
       if (e.cancelable) e.preventDefault()
@@ -269,6 +272,7 @@ export default function PositionSelector({
     }
     const onPointerCancelCapture = () => {
       navSwipeStartRef.current = null
+      unlockHorizontalSwipeScroll()
       setNavDragActive(false)
       setNavDragOffsetPx(0)
     }
@@ -277,6 +281,7 @@ export default function PositionSelector({
     window.addEventListener('pointerup', onPointerUpCapture, true)
     window.addEventListener('pointercancel', onPointerCancelCapture, true)
     return () => {
+      unlockHorizontalSwipeScroll()
       window.removeEventListener('pointerdown', onPointerDownCapture, true)
       window.removeEventListener('pointermove', onPointerMoveCapture, true)
       window.removeEventListener('pointerup', onPointerUpCapture, true)
@@ -414,12 +419,12 @@ export default function PositionSelector({
 
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <div
-          className="relative flex min-h-0 flex-1 flex-col overflow-hidden px-app-screen pt-1 pb-[max(5.5rem,env(safe-area-inset-bottom,0px)+4.5rem)]"
+          className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
           style={{ touchAction: 'pan-y' }}
         >
-          <div className="flex h-full min-h-0" style={navTrackStyle}>
+          <div className="flex h-full min-h-0 shrink-0" style={navTrackStyle}>
             <section
-              className="flex min-h-0 shrink-0 flex-col"
+              className="flex min-h-0 shrink-0 flex-col px-app-screen pt-1 pb-[max(5.5rem,env(safe-area-inset-bottom,0px)+4.5rem)]"
               style={navPanelStyle}
               aria-hidden={panelIndex !== 0}
             >
@@ -447,7 +452,7 @@ export default function PositionSelector({
             </section>
 
             <section
-              className="flex min-h-0 shrink-0 flex-col"
+              className="flex min-h-0 shrink-0 flex-col px-app-screen pt-1 pb-[max(5.5rem,env(safe-area-inset-bottom,0px)+4.5rem)]"
               style={navPanelStyle}
               aria-hidden={panelIndex !== 1}
             >
@@ -470,7 +475,7 @@ export default function PositionSelector({
             </section>
 
             <section
-              className="flex min-h-0 shrink-0 flex-col"
+              className="flex min-h-0 shrink-0 flex-col px-app-screen pt-1 pb-[max(5.5rem,env(safe-area-inset-bottom,0px)+4.5rem)]"
               style={navPanelStyle}
               aria-hidden={panelIndex !== 2}
             >

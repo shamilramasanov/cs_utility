@@ -46,6 +46,16 @@ body {
   overflow-y: auto;
 }
 
+html.horizontal-swipe-lock,
+html.horizontal-swipe-lock body {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+}
+
+html.horizontal-swipe-lock * {
+  overscroll-behavior: none !important;
+}
+
 /* App Router: #__next нет; main оставляем на будущее */
 #__next, main {
   height: 100%;
