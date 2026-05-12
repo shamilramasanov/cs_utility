@@ -363,6 +363,7 @@ export default function PositionSelector({
                 onSelect={setSelectedGrenade}
                 onThrowVariantSelect={handleMapThrowVariantSelect}
                 imagePosition={selectedGrenade ? 'top' : 'center'}
+                displaySide={pickerTeam === 'any' ? undefined : pickerTeam}
                 activeThrowVariantIndex={activeThrowVariantIndex}
               />
               {selectedGrenade && <div className="pointer-events-none absolute inset-0 bg-black/18" />}

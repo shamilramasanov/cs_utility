@@ -968,6 +968,7 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
                             ? 'top'
                             : 'center'
                       }
+                      displaySide={sideKey}
                       activeThrowVariantIndex={activeThrowVariantIndex}
                       subspotMarker={
                         selectedSubspot && selectedSubspot.point

@@ -4,6 +4,7 @@ import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
 import type { Grenade } from '@/types'
 import { GRENADE_COLORS } from '@/lib/grenades'
 import { throwOriginStrokeColor, throwOriginStrokeWidth } from '@/lib/map-marker-visual'
+import { sideKeyToSide, type SideKey } from '@/lib/side'
 import RadarLandMarker from '@/components/map/RadarLandMarker'
 import { radarImageObjectPosition, useRadarImageBox } from '@/hooks/useRadarImageBox'
 
@@ -28,6 +29,8 @@ interface Props {
   onZoomChange?: (zoom: number) => void
   /** Название карты в одной строке с кнопками зума (слева). */
   mapTitle?: string
+  /** Текущая сторона экрана: для `both`-раскидок кольцо выглядит как активная сторона. */
+  displaySide?: SideKey
 }
 
 /** Маркер приёма (куда падает утилита) — чуть компактнее, чем раньше. */
@@ -63,6 +66,7 @@ export default function MapView({
   subspotMarker = null,
   onZoomChange,
   mapTitle,
+  displaySide,
 }: Props) {
   /** Область радара без тулбара — сюда вписан `img` (`object-fit: contain`), от неё считаем маркеры. */
   const radarLayoutRef = useRef<HTMLDivElement>(null)
@@ -429,6 +433,7 @@ export default function MapView({
               const isHighlighted =
                 previewGrenade?.id === g.id || selectedGrenade?.id === g.id
               const color = GRENADE_COLORS[g.type] ?? '#fff'
+              const markerSide = g.side === 'both' && displaySide ? sideKeyToSide(displaySide) : g.side
               return (
                 <div
                   key={g.id}
@@ -442,7 +447,7 @@ export default function MapView({
                 >
                   <RadarLandMarker
                     type={g.type}
-                    side={g.side}
+                    side={markerSide}
                     variant="public"
                     selected={isHighlighted}
                     muted={dimNonFocusedMarkers && !isHighlighted}
@@ -478,8 +483,12 @@ export default function MapView({
                         origins.length - 1,
                       )
                     : -1
-                const strokeTeam = throwOriginStrokeColor(lineGrenade.side)
-                const sw = throwOriginStrokeWidth(lineGrenade.side, s)
+                const lineSide =
+                  lineGrenade.side === 'both' && displaySide
+                    ? sideKeyToSide(displaySide)
+                    : lineGrenade.side
+                const strokeTeam = throwOriginStrokeColor(lineSide)
+                const sw = throwOriginStrokeWidth(lineSide, s)
                 const gt = lineGrenade.type
 
                 return (
