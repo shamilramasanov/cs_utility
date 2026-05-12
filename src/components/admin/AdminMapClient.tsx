@@ -67,15 +67,15 @@ const THROW_SELECT_OPTS: Array<{ id: string; label: string }> = [
 function newVariantRow(landX: number, landY: number, copy?: CustomThrowVariant): CustomThrowVariant {
   return {
     id: crypto.randomUUID(),
-    label: copy?.label ? `${copy.label} (копия)` : 'Вариант',
+    label: 'Вариант',
     sx: copy?.sx ?? landX,
     sy: copy?.sy ?? landY,
     throw_type: copy?.throw_type ?? 'normal',
-    video_url: copy?.video_url ?? '',
-    gallery: copy?.gallery ? [...copy.gallery] : [],
-    description: copy?.description ?? '',
-    method_media_url: copy?.method_media_url ?? '',
-    method_hint: copy?.method_hint ?? '',
+    video_url: '',
+    gallery: [],
+    description: '',
+    method_media_url: '',
+    method_hint: '',
   }
 }
 
@@ -661,7 +661,6 @@ export default function AdminMapClient({
       setSelectedKey(keyCustom(nu.id))
       setAddMode(false)
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [box, radarPick, selectedCustom, addSecondStepId, addMode, preferTwoClickAdd, mapId, currentLayer.file, applyContextDefaults]
   )
 
@@ -783,12 +782,16 @@ export default function AdminMapClient({
       return visibleCustom.filter((l) => l.id === selectedCustom.id)
     }
     if (isAddingNewPoint) return []
+    if (selectedCustom) return visibleCustom.filter((l) => l.id === selectedCustom.id)
+    if (selectedSeed) return []
     return visibleCustom
-  }, [visibleCustom, addSecondStepId, radarPick, selectedCustom, isAddingNewPoint])
+  }, [visibleCustom, addSecondStepId, radarPick, selectedCustom, selectedSeed, isAddingNewPoint])
   const renderedSeeds = useMemo(() => {
     if (radarPick || addSecondStepId || isAddingNewPoint) return []
+    if (selectedCustom) return []
+    if (selectedSeed) return visibleSeeds.filter((g) => g.id === selectedSeed.id)
     return visibleSeeds
-  }, [visibleSeeds, radarPick, addSecondStepId, isAddingNewPoint])
+  }, [visibleSeeds, radarPick, addSecondStepId, isAddingNewPoint, selectedCustom, selectedSeed])
   const hiddenInActionMode =
     visibleCustom.length + visibleSeeds.length - (renderedCustom.length + renderedSeeds.length)
 

@@ -76,11 +76,18 @@ export default function BottomSheet({
   const diffColor = DIFFICULTY_COLORS[grenade.difficulty] ?? '#888'
   const diffLabel = DIFFICULTY_LABELS[grenade.difficulty] ?? grenade.difficulty
   const variants = grenade.throw_variants?.filter(Boolean) ?? []
-  const vi = Math.min(Math.max(0, activeThrowVariantIndex), Math.max(0, variants.length - 1))
-  const activeVar = variants.length > 0 ? variants[vi] : null
-  const showVariantDock = variants.length > 1 && Boolean(onThrowVariantIndexChange)
+  const variantCount = variants.length
+  const vi = Math.min(Math.max(0, activeThrowVariantIndex), Math.max(0, variantCount - 1))
+  const activeVar = variantCount > 0 ? variants[vi] : null
+  const showVariantDock = variantCount > 1 && Boolean(onThrowVariantIndexChange)
+  const [variantMotion, setVariantMotion] = useState<'next' | 'prev'>('next')
   const mediaUrl = activeVar?.media_url ?? grenade.media_url
   const gallery = (activeVar?.gallery_urls ?? grenade.gallery_urls)?.filter(Boolean) ?? []
+  const contentTransitionKey = `${grenade.id}:${vi}`
+  const contentTransitionClass =
+    variantMotion === 'prev'
+      ? 'throw-variant-content-enter-prev'
+      : 'throw-variant-content-enter-next'
   const throwType = activeVar?.throw_type ?? grenade.throw_type
   const variantDescription =
     activeVar?.description?.trim() && activeVar.description !== 'unused'
@@ -137,17 +144,25 @@ export default function BottomSheet({
 
   useEffect(() => () => teardownThrowVariantSwipeWindow(), [])
 
+  const handleVariantIndexChange = useCallback(
+    (next: number) => {
+      setVariantMotion(next < vi ? 'prev' : 'next')
+      onThrowVariantIndexChange?.(next)
+    },
+    [onThrowVariantIndexChange, vi],
+  )
+
   const getMediaSwipeCtx = useCallback(
     () => ({
-      count: variants.length,
+      count: variantCount,
       activeIndex: vi,
-      onChange: onThrowVariantIndexChange!,
+      onChange: handleVariantIndexChange,
     }),
-    [variants.length, vi, onThrowVariantIndexChange],
+    [variantCount, vi, handleVariantIndexChange],
   )
 
   const onMediaBlockSwipeTouchStart = (e: React.TouchEvent) => {
-    if (!showVariantDock || !onThrowVariantIndexChange || variants.length < 2) return
+    if (!showVariantDock || variantCount < 2) return
     if (e.touches.length !== 1) return
     const tch = e.touches[0]
     beginThrowVariantSwipeWindowTracking(tch.identifier, tch.clientX, tch.clientY, getMediaSwipeCtx)
@@ -299,8 +314,9 @@ export default function BottomSheet({
         <div className="relative flex min-h-0 flex-1 flex-col">
           {hasMediaBlock ? (
             <div
+              key={contentTransitionKey}
               ref={mediaScrollRef}
-              className={`min-h-0 flex-1 overflow-y-auto snap-y snap-mandatory bg-black/30 ${
+              className={`throw-variant-content ${contentTransitionClass} min-h-0 flex-1 overflow-y-auto snap-y snap-mandatory bg-black/30 ${
                 showVariantDock ? 'pb-20' : ''
               }`}
               style={{ WebkitOverflowScrolling: 'touch' }}
@@ -338,7 +354,8 @@ export default function BottomSheet({
             </div>
           ) : (
             <div
-              className={`flex min-h-0 flex-1 flex-col mx-4 mb-3 rounded-2xl items-center justify-center gap-1.5 ${
+              key={contentTransitionKey}
+              className={`throw-variant-content ${contentTransitionClass} flex min-h-0 flex-1 flex-col mx-4 mb-3 rounded-2xl items-center justify-center gap-1.5 ${
                 showVariantDock ? 'pb-20' : ''
               }`}
               style={{ background: '#242424', border: `1px dashed ${color}44` }}
@@ -353,9 +370,9 @@ export default function BottomSheet({
         {showVariantDock && onThrowVariantIndexChange && (
           <ThrowVariantOriginDock
             pinToScreenBottom
-            count={variants.length}
+            count={variantCount}
             activeIndex={vi}
-            onChange={onThrowVariantIndexChange}
+            onChange={handleVariantIndexChange}
             labels={variants.map((v) => v.label)}
           />
         )}
@@ -436,8 +453,9 @@ export default function BottomSheet({
         <div className="relative flex min-h-0 flex-1 flex-col">
           {hasMediaBlock && (
             <div
+              key={contentTransitionKey}
               ref={mediaScrollRef}
-              className={`min-h-0 flex-1 overflow-y-auto snap-y snap-mandatory rounded-t-2xl bg-black/30 ${
+              className={`throw-variant-content ${contentTransitionClass} min-h-0 flex-1 overflow-y-auto snap-y snap-mandatory rounded-t-2xl bg-black/30 ${
                 showVariantDock ? 'pb-20' : ''
               }`}
               style={{ WebkitOverflowScrolling: 'touch' }}
@@ -478,7 +496,8 @@ export default function BottomSheet({
 
           {!hasMediaBlock && (
             <div
-              className={`mx-5 mb-4 flex aspect-video shrink-0 flex-col items-center justify-center gap-2 rounded-2xl ${
+              key={contentTransitionKey}
+              className={`throw-variant-content ${contentTransitionClass} mx-5 mb-4 flex aspect-video shrink-0 flex-col items-center justify-center gap-2 rounded-2xl ${
                 showVariantDock ? 'mb-20' : ''
               }`}
               style={{ background: '#242424', border: `1px dashed ${color}44` }}
@@ -494,9 +513,9 @@ export default function BottomSheet({
         {showVariantDock && onThrowVariantIndexChange && (
           <ThrowVariantOriginDock
             pinToScreenBottom
-            count={variants.length}
+            count={variantCount}
             activeIndex={vi}
-            onChange={onThrowVariantIndexChange}
+            onChange={handleVariantIndexChange}
             labels={variants.map((v) => v.label)}
           />
         )}

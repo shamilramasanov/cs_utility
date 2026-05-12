@@ -98,6 +98,52 @@ body {
   animation: slide-up 0.3s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+/* Переход между стартовыми позициями/вариантами в BottomSheet. */
+@keyframes throw-variant-content-next {
+  0% {
+    opacity: 0;
+    transform: translateX(1.35rem) scale(0.985);
+    filter: blur(5px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes throw-variant-content-prev {
+  0% {
+    opacity: 0;
+    transform: translateX(-1.35rem) scale(0.985);
+    filter: blur(5px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+.throw-variant-content {
+  will-change: transform, opacity, filter;
+}
+
+.throw-variant-content-enter-next {
+  animation: throw-variant-content-next 0.28s cubic-bezier(0.22, 0.75, 0.25, 1);
+}
+
+.throw-variant-content-enter-prev {
+  animation: throw-variant-content-prev 0.28s cubic-bezier(0.22, 0.75, 0.25, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .throw-variant-content-enter-next,
+  .throw-variant-content-enter-prev {
+    animation: none;
+  }
+}
+
 /* Акцент на методе броска: мягкое зелёное мигание для мгновенного считывания. */
 @keyframes throw-method-attention {
   0%, 100% {
