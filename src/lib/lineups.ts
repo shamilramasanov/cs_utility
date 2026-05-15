@@ -95,3 +95,11 @@ export async function getMergedGrenadesForMapFirstLayer(mapId: string): Promise<
   if (!layer0) return merged
   return merged.filter((g) => !g.layer_file || g.layer_file === layer0)
 }
+
+export async function getGrenadeById(id: string): Promise<Grenade | null> {
+  const file = await readCustomLineupsFile()
+  const custom = file.lineups.find((l) => l.id === id)
+  if (custom) return customLineupToGrenade(custom)
+  const seed = (grenadesData.grenades as Grenade[]).find((g) => g.id === id)
+  return seed ?? null
+}

@@ -140,6 +140,97 @@ export interface Dictionary {
     grenadesCount: string
     layerToggle: string
   }
+  team: {
+    title: string
+    subtitle: string
+    create: string
+    join: string
+    joinGo: string
+    codePlaceholder: string
+    newMeet: string
+    map: string
+    side: string
+    tactic: string
+    nickname: string
+    nicknamePrompt: string
+    createMeet: string
+    createHint: string
+    briefingTitle: string
+    briefingHint: string
+    lockBriefing: string
+    openBriefing: string
+    waitingBriefing: string
+    waitingBriefingHint: string
+    tabText: string
+    tabMap: string
+    filterAll: string
+    dockTactics: string
+    dockLineups: string
+    created: string
+    copyLink: string
+    copied: string
+    goLobby: string
+    viewPlan: string
+    soloPreviewHint: string
+    fillDemoTeam: string
+    clearDemoTeam: string
+    previewRole: string
+    lobbyTitle: string
+    lobbyHint: string
+    startPlan: string
+    waitingTactic: string
+    changeTactic: string
+    changeRole: string
+    leave: string
+    ready: string
+    round: string
+    restart: string
+    openVideo: string
+    backToPlan: string
+    roleFree: string
+    roleTaken: string
+    captain: string
+    expired: string
+    invalidLink: string
+    tacticChanged: string
+    longPressHint: string
+    scenario: {
+      pistol: string
+      eco: string
+      force: string
+      full: string
+      any: string
+    }
+    role: {
+      pickerTitle: string
+      entry: string
+      entryHint: string
+      awp: string
+      awpHint: string
+      lurker: string
+      lurkerHint: string
+      support: string
+      supportHint: string
+      igl: string
+      iglHint: string
+      anchor_a: string
+      anchor_aHint: string
+      anchor_b: string
+      anchor_bHint: string
+    }
+    stepKind: {
+      spawn: string
+      move: string
+      hold: string
+      throw: string
+      peek: string
+      exec: string
+      rotate: string
+      note: string
+    }
+    lineupBtn: string
+    noPlanForRole: string
+  }
   admin: {
     pickSide: string
     pickSideHint: string

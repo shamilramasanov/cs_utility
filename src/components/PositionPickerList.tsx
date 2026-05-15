@@ -98,15 +98,25 @@ export default function PositionPickerList({
         </div>
       </div>
 
-      <div className="no-scrollbar min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-y-contain px-4 pb-4 [-webkit-overflow-scrolling:touch]">
+      <div className="no-scrollbar min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-y-contain px-4 pb-4 [-webkit-overflow-scrolling:touch]">
         {grouped.length === 0 ? (
           <div className="pt-10 text-center text-sm text-[#666]">{t('common.nothingFound')}</div>
         ) : (
           grouped.map(({ cat, items }) => (
-            <section key={cat}>
-              <h3 className="mb-2 px-1 text-[11px] font-bold uppercase tracking-widest text-[#777]">
-                {t(`position.category.${cat}` as const)}
-              </h3>
+            <section key={cat} className="border-t border-[#242424] pt-4 first:border-t-0 first:pt-0">
+              <div className="mb-3 flex items-center gap-3 px-1">
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#F0B429] shadow-[0_0_0_3px_rgba(240,180,41,0.14)]"
+                  aria-hidden
+                />
+                <h3 className="shrink-0 text-[13px] font-extrabold uppercase tracking-[0.18em] text-[#f2f2f2]">
+                  {t(`position.category.${cat}` as const)}
+                </h3>
+                <span
+                  className="h-px min-w-0 flex-1 bg-gradient-to-r from-[#4a4a4a] via-[#2f2f2f] to-transparent"
+                  aria-hidden
+                />
+              </div>
               <ul
                 className="overflow-hidden rounded-2xl border border-[#262626] bg-[#141414]"
                 role="list"

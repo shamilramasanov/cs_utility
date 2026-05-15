@@ -1,6 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
+import { usePathname } from 'next/navigation'
 
 /**
  * next/dynamic + ssr: false — только в Client Component. Убирает гидрационные

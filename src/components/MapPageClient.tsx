@@ -43,6 +43,7 @@ import {
 } from '@/lib/map-page-initial-query'
 import { buildThrowOriginItems } from '@/lib/throw-origin-items'
 import ThrowOriginPositionCards from './ThrowOriginPositionCards'
+import { MeetSessionProvider } from '@/context/MeetSessionContext'
 
 const mapViewFallback = <div className="h-full w-full bg-[#121212]" aria-hidden />
 const panelFallback = <div className="h-full w-full bg-[#0d0d0d]" aria-hidden />
@@ -172,6 +173,8 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
   const posIdFromUrl = searchParams.get('pos')
   const spotIdFromUrl = searchParams.get('spot')
   const zoneIdFromUrl = searchParams.get('zone')
+  const meetCode = searchParams.get('meet')
+  const fromMeet = searchParams.get('fromMeet')
   const selectedPos = useMemo(
     () => (posIdFromUrl ? getPositionById(posIdFromUrl, positionCatalog) : undefined),
     [posIdFromUrl, positionCatalog],
@@ -212,12 +215,24 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
   }, [selectedPos, sideRaw])
 
   const pickerTeam: SideKey | 'any' = useMemo(() => {
+    if (meetCode) {
+      const locked = parseSideKey(sideRaw)
+      return locked ?? 't'
+    }
     if (selectedPos) return sideKey
     if (sideRaw === 'any') return 'any'
     if (sideRaw === 'ct' || sideRaw === 't') return sideRaw
-    // Дефолт на экране выбора позиции: показываем обе стороны.
     return 'any'
-  }, [selectedPos, sideKey, sideRaw])
+  }, [meetCode, selectedPos, sideKey, sideRaw])
+
+  useEffect(() => {
+    if (!meetCode) return
+    const meetSide = searchParams.get('side')
+    const locked = parseSideKey(meetSide)
+    if (!locked) return
+    setSideRaw((prev) => (prev === locked ? prev : locked))
+    writeStoredPickerTeam(mapId, locked)
+  }, [mapId, meetCode, searchParams])
   const subspots = useMemo(
     () => (selectedPos ? getSubspotsForPosition(selectedPos.id, positionCatalog) : []),
     [selectedPos, positionCatalog],
@@ -505,6 +520,10 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
       navigate((sp) => sp.delete('zone'))
       return
     }
+    if (fromMeet) {
+      router.push(fromMeet)
+      return
+    }
     router.push('/')
   }, [
     selectedGrenade,
@@ -516,6 +535,7 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
     router,
     zoneIdFromUrl,
     navigate,
+    fromMeet,
   ])
 
   // ─── Фильтрация ────────────────────────────────────────────────────────────
@@ -730,7 +750,13 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
       if (pnadeRaw) sp.set('pnade', pnadeRaw)
       return sp.toString()
     })()
-    const backHref = zoneIdFromUrl ? (backQs ? `${pathname}?${backQs}` : pathname) : '/'
+    const backHref = fromMeet
+      ? fromMeet
+      : zoneIdFromUrl
+        ? backQs
+          ? `${pathname}?${backQs}`
+          : pathname
+        : '/'
     const pickPositionHref = (positionId: string) => {
       const pos = getPositionById(positionId, positionCatalog)
       let sk: SideKey = sideKey
@@ -781,7 +807,7 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
               <PositionSelector
                 map={map}
                 pickerTeam={pickerTeam}
-                onPickerTeamChange={setPickerTeam}
+                onPickerTeamChange={meetCode ? () => {} : setPickerTeam}
                 nadeFilter={pickerNadeFilter}
                 onNadeFilterChange={setPickerNadeFilter}
                 positions={zonePickerPositions}
@@ -789,6 +815,8 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
                 positionCatalog={positionCatalog}
                 onPick={onPositionPick}
                 onBack={onSmartBack}
+                hideBottomNav={Boolean(meetCode)}
+                hideTeamFilter={Boolean(meetCode)}
                 navigationLinks={{
                   backHref,
                   pickPosition: pickPositionHref,
@@ -820,7 +848,10 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
    *    на mobile — старый flow с BottomSheet.
    */
   return (
-    <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-x-hidden overscroll-none bg-[#0d0d0d]" suppressHydrationWarning>
+    <div
+      className="flex h-full min-h-0 w-full flex-1 flex-col overflow-x-hidden overscroll-none bg-[#0d0d0d]"
+      suppressHydrationWarning
+    >
       {/* Только переключатель слоя; название карты — угловая плашка на блоке радара. */}
       <div
         ref={mapLineupHeaderAnchorRef}
@@ -1095,7 +1126,7 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
         )}
       </div>
 
-      {!open && !showSubspotPicker && !showLineupGallery && (
+      {!meetCode && !open && !showSubspotPicker && !showLineupGallery && (
         <FilterBar
           types={GRENADE_TYPES}
           active={activeFilter}
@@ -1131,8 +1162,10 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
 
 export default function MapPageClient(props: Props) {
   return (
-    <Suspense fallback={<MapPageLoadingFallback />}>
-      <MapPageClientInner {...props} />
-    </Suspense>
+    <MeetSessionProvider>
+      <Suspense fallback={<MapPageLoadingFallback />}>
+        <MapPageClientInner {...props} />
+      </Suspense>
+    </MeetSessionProvider>
   )
 }

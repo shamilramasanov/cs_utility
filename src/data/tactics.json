@@ -1,0 +1,330 @@
+{
+  "tactics": [
+    {
+      "id": "mirage_t_default_a",
+      "map": "de_mirage",
+      "side": "T",
+      "name": "T Default A",
+      "description": "Стандартный заход на A через mid → window → stairs. Лурк через апки страхует ротацию.",
+      "scenario": "full",
+      "source": "preset",
+      "created_at": "2026-05-05",
+      "tactic_overview": {
+        "exec_target": { "x": 0.42, "y": 0.22, "label": "A site" }
+      },
+      "role_plans": [
+        {
+          "role": "entry",
+          "brief": "Первым залетает на A через stairs после смока на window.",
+          "steps": [
+            { "id": "e1", "kind": "spawn", "text": "Закуп: AK-47, броня, флешка, смок." },
+            {
+              "id": "e2",
+              "kind": "move",
+              "time": 5,
+              "position_id": "t_spawn",
+              "text": "Бежим в Top Mid через спавн.",
+              "path": [
+                { "x": 0.87, "y": 0.36 },
+                { "x": 0.75, "y": 0.4 },
+                { "x": 0.62, "y": 0.42 }
+              ]
+            },
+            { "id": "e3", "kind": "hold", "time": 15, "position_id": "top_mid", "text": "Холд за ящиком, ждём дымы support." },
+            { "id": "e4", "kind": "throw", "time": 25, "position_id": "top_mid", "text": "Свой смок на CT — закрыть ротацию." },
+            {
+              "id": "e5",
+              "kind": "exec",
+              "time": 35,
+              "position_id": "stairs",
+              "text": "По дымам залетаем через Stairs на сайт.",
+              "path": [
+                { "x": 0.62, "y": 0.42 },
+                { "x": 0.55, "y": 0.35 },
+                { "x": 0.52, "y": 0.32 }
+              ]
+            },
+            {
+              "id": "e6",
+              "kind": "peek",
+              "time": 45,
+              "position_id": "a_site",
+              "text": "Холд Jungle и Ticket, ждём support на трейд.",
+              "path": [
+                { "x": 0.52, "y": 0.32 },
+                { "x": 0.46, "y": 0.26 },
+                { "x": 0.42, "y": 0.22 }
+              ]
+            }
+          ]
+        },
+        {
+          "role": "awp",
+          "brief": "AWP-пик из top mid, после фрага — отход в коннектор.",
+          "steps": [
+            { "id": "a1", "kind": "spawn", "text": "Закуп: AWP, броня, флешка." },
+            { "id": "a2", "kind": "move", "time": 5, "text": "Бежим в Top Mid за entry." },
+            { "id": "a3", "kind": "peek", "time": 12, "position_id": "top_mid", "text": "Быстрый пик до смока на window." },
+            { "id": "a4", "kind": "rotate", "time": 30, "position_id": "connector", "text": "После пика — отход в Connector." },
+            { "id": "a5", "kind": "exec", "time": 40, "position_id": "a_site", "text": "Заход на сайт после entry." }
+          ]
+        },
+        {
+          "role": "lurker",
+          "brief": "Лурк через B Apps, ловит ротацию CT через mid.",
+          "steps": [
+            { "id": "l1", "kind": "spawn", "text": "Закуп: AK-47, броня, смок." },
+            { "id": "l2", "kind": "move", "time": 5, "position_id": "apartments", "text": "Бежим в Apartments через spawn." },
+            { "id": "l3", "kind": "hold", "time": 25, "position_id": "apartments", "text": "Тихий холд в апсике, без шума." },
+            { "id": "l4", "kind": "peek", "time": 40, "position_id": "market", "text": "Пик через Market после exec на A." },
+            { "id": "l5", "kind": "rotate", "time": 70, "position_id": "connector", "text": "Если ретейк — режем через Connector в спину." }
+          ]
+        },
+        {
+          "role": "support",
+          "brief": "Смоки на window и stairs, флешит entry.",
+          "steps": [
+            { "id": "s1", "kind": "spawn", "text": "Закуп: AK-47, броня, 2 смока, флешка." },
+            { "id": "s2", "kind": "move", "time": 5, "text": "Бежим в Top Mid за AWP." },
+            {
+              "id": "s3",
+              "kind": "throw",
+              "time": 18,
+              "position_id": "top_mid",
+              "grenade_id": "df2bbc58-5b20-4166-add1-5ff9e2ba69cf",
+              "text": "Смок на Window — отрезать AWP CT.",
+              "grenade_marker": { "x": 0.58, "y": 0.28, "type": "smoke" }
+            },
+            { "id": "s4", "kind": "throw", "time": 24, "position_id": "top_mid", "text": "Смок на Stairs — закрыть Jungle." },
+            { "id": "s5", "kind": "throw", "time": 35, "position_id": "stairs", "text": "Pop-flash для entry." },
+            { "id": "s6", "kind": "exec", "time": 38, "position_id": "a_site", "text": "Вторым после entry, держим Default." }
+          ]
+        },
+        {
+          "role": "igl",
+          "brief": "Командует темпом, читает mid и зовёт exec.",
+          "steps": [
+            { "id": "i1", "kind": "spawn", "text": "Закуп: AK-47, броня, флешка, смок (опц.)." },
+            { "id": "i2", "kind": "move", "time": 5, "text": "Бежим в Top Mid с командой." },
+            { "id": "i3", "kind": "hold", "time": 15, "position_id": "top_mid", "text": "Слушаем шум CT на mid." },
+            { "id": "i4", "kind": "note", "time": 25, "text": "Решение: A exec или фейк A → B." },
+            { "id": "i5", "kind": "exec", "time": 40, "position_id": "a_site", "text": "Третьим на сайт, прикрываем default." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mirage_t_b_apps_rush",
+      "map": "de_mirage",
+      "side": "T",
+      "name": "B Apps Rush",
+      "description": "Агрессивный форс через апартаменты на B.",
+      "scenario": "force",
+      "source": "preset",
+      "created_at": "2026-05-05",
+      "role_plans": [
+        {
+          "role": "entry",
+          "brief": "Первым влетает на B через apps.",
+          "steps": [
+            { "id": "be1", "kind": "spawn", "text": "Закуп: AK/M4, броня, флеш." },
+            { "id": "be2", "kind": "move", "time": 8, "position_id": "apartments", "text": "Быстрый рывок в Apartments." },
+            { "id": "be3", "kind": "exec", "time": 22, "position_id": "b_site", "text": "Влет на B после флеша support." }
+          ]
+        },
+        {
+          "role": "support",
+          "brief": "Флеш и смок на market.",
+          "steps": [
+            { "id": "bs1", "kind": "spawn", "text": "Закуп: утилита + пистолет/AK." },
+            { "id": "bs2", "kind": "throw", "time": 15, "text": "Флеш в дверь apps." },
+            { "id": "bs3", "kind": "hold", "time": 30, "position_id": "market", "text": "Прикрываем выход CT." }
+          ]
+        },
+        {
+          "role": "igl",
+          "brief": "Зовёт темп, не даёт затянуть.",
+          "steps": [
+            { "id": "bi1", "kind": "move", "time": 5, "text": "Идём пачкой в apps." },
+            { "id": "bi2", "kind": "exec", "time": 20, "text": "Раш на B без остановок." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mirage_ct_default",
+      "map": "de_mirage",
+      "side": "CT",
+      "name": "CT Default",
+      "description": "Базовая расстановка: anchor B, AWP mid, ротация по инфо.",
+      "scenario": "full",
+      "source": "preset",
+      "created_at": "2026-05-05",
+      "role_plans": [
+        {
+          "role": "anchor_b",
+          "brief": "Держит B site и apps.",
+          "steps": [
+            { "id": "cb1", "kind": "spawn", "text": "Закуп: M4/AK, утилита." },
+            { "id": "cb2", "kind": "hold", "time": 10, "position_id": "b_site", "text": "Холд apps angle." },
+            { "id": "cb3", "kind": "rotate", "time": 60, "text": "Ротация на A по коллу." }
+          ]
+        },
+        {
+          "role": "anchor_a",
+          "brief": "Держит A default и stairs.",
+          "steps": [
+            { "id": "ca1", "kind": "hold", "time": 5, "position_id": "a_site", "text": "Холд default / jungle." },
+            { "id": "ca2", "kind": "peek", "time": 25, "text": "Пик window после смока." }
+          ]
+        },
+        {
+          "role": "awp",
+          "brief": "AWP mid / window control.",
+          "steps": [
+            { "id": "cw1", "kind": "hold", "time": 8, "position_id": "top_mid", "text": "Пик mid с безопасной позиции." },
+            { "id": "cw2", "kind": "rotate", "time": 45, "text": "Отход на A или B по инфо." }
+          ]
+        },
+        {
+          "role": "igl",
+          "brief": "Читает инфо, зовёт ротации.",
+          "steps": [
+            { "id": "ci1", "kind": "hold", "time": 15, "position_id": "connector", "text": "Слушаем mid и apps." },
+            { "id": "ci2", "kind": "note", "time": 40, "text": "Колл ротации или стек." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dust2_t_long_default",
+      "map": "de_dust2",
+      "side": "T",
+      "name": "T Long Default",
+      "description": "Контроль long, давление на A.",
+      "scenario": "full",
+      "source": "preset",
+      "created_at": "2026-05-05",
+      "role_plans": [
+        {
+          "role": "entry",
+          "brief": "Давит long, заходит на pit.",
+          "steps": [
+            { "id": "de1", "kind": "move", "time": 10, "text": "Бежим long." },
+            { "id": "de2", "kind": "exec", "time": 35, "text": "Заход на A с long." }
+          ]
+        },
+        {
+          "role": "support",
+          "brief": "Смоки на cross и car.",
+          "steps": [
+            { "id": "ds1", "kind": "throw", "time": 18, "text": "Смок cross." },
+            { "id": "ds2", "kind": "throw", "time": 28, "text": "Смок car / CT." }
+          ]
+        },
+        {
+          "role": "igl",
+          "brief": "Темп long → A.",
+          "steps": [
+            { "id": "di1", "kind": "note", "time": 20, "text": "Читаем ответ CT на long." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dust2_ct_pistol_default",
+      "map": "de_dust2",
+      "side": "CT",
+      "name": "CT Pistol Default",
+      "description": "Пистолетный раунд: mid + B hold.",
+      "scenario": "pistol",
+      "source": "preset",
+      "created_at": "2026-05-05",
+      "role_plans": [
+        {
+          "role": "anchor_b",
+          "brief": "Держит B tunnels.",
+          "steps": [
+            { "id": "dp1", "kind": "hold", "text": "Группа на B, не пикать лишнее." }
+          ]
+        },
+        {
+          "role": "awp",
+          "brief": "Короткий AWP mid (если есть).",
+          "steps": [
+            { "id": "dp2", "kind": "peek", "text": "Один пик mid, отход." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "inferno_t_b_default",
+      "map": "de_inferno",
+      "side": "T",
+      "name": "T B Default",
+      "description": "Контроль banana, заход на B.",
+      "scenario": "full",
+      "source": "preset",
+      "created_at": "2026-05-05",
+      "role_plans": [
+        {
+          "role": "entry",
+          "brief": "Первым на banana → B.",
+          "steps": [
+            { "id": "ie1", "kind": "move", "time": 8, "text": "Бежим banana." },
+            { "id": "ie2", "kind": "exec", "time": 40, "text": "Влет на B после утилиты." }
+          ]
+        },
+        {
+          "role": "support",
+          "brief": "Молотовы и смоки на banana.",
+          "steps": [
+            { "id": "is1", "kind": "throw", "time": 15, "text": "Молик car / coffins." },
+            { "id": "is2", "kind": "throw", "time": 25, "text": "Смок CT / coffin." }
+          ]
+        },
+        {
+          "role": "igl",
+          "brief": "Темп banana control.",
+          "steps": [
+            { "id": "ii1", "kind": "hold", "time": 20, "text": "Не спешим, ждём ответ CT." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "inferno_ct_default",
+      "map": "de_inferno",
+      "side": "CT",
+      "name": "CT Default",
+      "description": "Anchor B banana, AWP mid/top.",
+      "scenario": "full",
+      "source": "preset",
+      "created_at": "2026-05-05",
+      "role_plans": [
+        {
+          "role": "anchor_b",
+          "brief": "Держит banana и coffin.",
+          "steps": [
+            { "id": "ic1", "kind": "hold", "text": "Холд banana angle." },
+            { "id": "ic2", "kind": "throw", "text": "Молик на push." }
+          ]
+        },
+        {
+          "role": "anchor_a",
+          "brief": "Держит A / apps.",
+          "steps": [
+            { "id": "ic3", "kind": "hold", "text": "Холд apps / arch." }
+          ]
+        },
+        {
+          "role": "igl",
+          "brief": "Ротации по инфо.",
+          "steps": [
+            { "id": "ic4", "kind": "note", "text": "Колл стек или ротация." }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -43,6 +43,9 @@ interface Props {
   /** Фильтр гранат — состояние в родителе, чтобы не терять при уходе на экран позиции и назад. */
   nadeFilter: PickerNadeFilter
   onNadeFilterChange: (f: PickerNadeFilter) => void
+  /** Сессия тактики: скрыть нижнее меню «Карта / карточки / список». */
+  hideBottomNav?: boolean
+  hideTeamFilter?: boolean
 }
 
 const MapView = dynamic(() => import('./MapView'), {
@@ -98,6 +101,8 @@ export default function PositionSelector({
   navigationLinks,
   nadeFilter,
   onNadeFilterChange,
+  hideBottomNav = false,
+  hideTeamFilter = false,
 }: Props) {
   const t = useT()
   const searchParams = useSearchParams()
@@ -438,6 +443,7 @@ export default function PositionSelector({
     () => ({ width: `${panelWidthPercent}%` }),
     [panelWidthPercent],
   )
+  const panelBottomPad = hideBottomNav ? 'pb-2' : 'pb-[calc(4.5rem+env(safe-area-inset-bottom))]'
 
   return (
     <div className="relative flex h-full min-h-0 flex-col bg-[#0d0d0d]">
@@ -447,9 +453,10 @@ export default function PositionSelector({
           onNadeChange={onNadeFilterChange}
           team={pickerTeam}
           onTeamChange={onPickerTeamChange}
+          hideTeamFilter={hideTeamFilter}
         />
 
-        {panelIndex === 0 && map.layers.length > 1 && (
+        {panelIndex === 0 && map.layers.length > 1 && !hideTeamFilter && (
           <div className="relative flex justify-end px-app-screen pb-2">
             <button
               type="button"
@@ -469,7 +476,7 @@ export default function PositionSelector({
         >
           <div ref={navTrackRef} className="flex h-full min-h-0 shrink-0" style={navTrackStyle}>
             <section
-              className="flex min-h-0 shrink-0 flex-col px-app-screen pt-1 pb-[max(5.5rem,env(safe-area-inset-bottom,0px)+4.5rem)]"
+              className={`flex min-h-0 shrink-0 flex-col px-app-screen pt-1 ${panelBottomPad}`}
               style={navPanelStyle}
               aria-hidden={panelIndex !== 0}
             >
@@ -497,7 +504,7 @@ export default function PositionSelector({
             </section>
 
             <section
-              className="flex min-h-0 shrink-0 flex-col px-app-screen pt-1 pb-[max(5.5rem,env(safe-area-inset-bottom,0px)+4.5rem)]"
+              className={`flex min-h-0 shrink-0 flex-col px-app-screen pt-1 ${panelBottomPad}`}
               style={navPanelStyle}
               aria-hidden={panelIndex !== 1}
             >
@@ -520,7 +527,7 @@ export default function PositionSelector({
             </section>
 
             <section
-              className="flex min-h-0 shrink-0 flex-col px-app-screen pt-1 pb-[max(5.5rem,env(safe-area-inset-bottom,0px)+4.5rem)]"
+              className={`flex min-h-0 shrink-0 flex-col px-app-screen pt-1 ${panelBottomPad}`}
               style={navPanelStyle}
               aria-hidden={panelIndex !== 2}
             >
@@ -545,6 +552,7 @@ export default function PositionSelector({
         </div>
       </div>
 
+      {!hideBottomNav && (
       <nav
         className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pt-1 sm:px-4"
         style={{ paddingBottom: 'max(0.35rem, env(safe-area-inset-bottom, 0px))' }}
@@ -596,6 +604,7 @@ export default function PositionSelector({
           })}
         </div>
       </nav>
+      )}
 
       {selectedGrenade && panelIndex === 0 && (
         <div

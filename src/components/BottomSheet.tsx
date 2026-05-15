@@ -16,6 +16,9 @@ interface Props {
   onThrowVariantIndexChange?: (i: number) => void
   /** true: часть flex-потока (карта видна сверху), без бэкдропа, без absolute */
   panel?: boolean
+  /** Кнопка «Назад к плану» (раздел тактики). */
+  backToPlanLabel?: string
+  onBackToPlan?: () => void
 }
 
 const THROW_LABELS: Record<string, string> = {
@@ -63,6 +66,8 @@ export default function BottomSheet({
   activeThrowVariantIndex = 0,
   onThrowVariantIndexChange,
   panel = false,
+  backToPlanLabel,
+  onBackToPlan,
 }: Props) {
   const t = useT()
   const sheetRef = useRef<HTMLDivElement>(null)
@@ -511,6 +516,16 @@ export default function BottomSheet({
             settleVariantTrack(index)
           }}
         >
+        {onBackToPlan && backToPlanLabel ? (
+          <button
+            type="button"
+            onClick={onBackToPlan}
+            className="flex h-11 w-full shrink-0 items-center gap-2 border-b border-[#262626] px-app-screen text-sm font-semibold text-[#F0B429]"
+          >
+            <span aria-hidden>←</span>
+            {backToPlanLabel}
+          </button>
+        ) : null}
         {/* Компактный ряд: тип, заголовок, бросок/позиция, закрыть */}
         <div className="relative flex shrink-0 items-start gap-2 border-b border-[#262626]/90 px-app-screen pb-2 pt-2">
           <div className="min-w-0 flex-1 space-y-1">

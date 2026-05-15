@@ -109,17 +109,27 @@ export default function PositionPhotoGrid({
         </div>
       </div>
 
-      <div className="no-scrollbar flex-1 min-h-0 overflow-y-auto overscroll-y-contain px-4 pb-0 space-y-5 [-webkit-overflow-scrolling:touch]">
+      <div className="no-scrollbar flex-1 min-h-0 overflow-y-auto overscroll-y-contain px-4 pb-0 space-y-6 [-webkit-overflow-scrolling:touch]">
         {grouped.length === 0 ? (
           <div className="text-center text-[#666] text-sm pt-10">
             {t('common.nothingFound')}
           </div>
         ) : (
           grouped.map(({ cat, items }) => (
-            <section key={cat}>
-              <h3 className="text-[11px] font-bold uppercase tracking-widest text-[#777] mb-2 px-1">
-                {t(`position.category.${cat}` as const)}
-              </h3>
+            <section key={cat} className="border-t border-[#242424] pt-4 first:border-t-0 first:pt-0">
+              <div className="mb-3 flex items-center gap-3 px-1">
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#F0B429] shadow-[0_0_0_3px_rgba(240,180,41,0.14)]"
+                  aria-hidden
+                />
+                <h3 className="shrink-0 text-[13px] font-extrabold uppercase tracking-[0.18em] text-[#f2f2f2]">
+                  {t(`position.category.${cat}` as const)}
+                </h3>
+                <span
+                  className="h-px min-w-0 flex-1 bg-gradient-to-r from-[#4a4a4a] via-[#2f2f2f] to-transparent"
+                  aria-hidden
+                />
+              </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                 {items.map((pos, idxInCat) => {
                   const count = countGrenadesForPosition(grenades, pos, positionCatalog)

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import {
   useCallback,
@@ -26,6 +27,7 @@ import {
 import { usePositionOverrides } from '@/lib/usePositionOverrides'
 import { PositionPhotoCard } from '@/components/PositionPhotoGrid'
 import { APP_SEARCH_ICON_SRC, SearchInputLeadingIcon } from '@/components/SearchInputLeadingIcon'
+import { getActiveMeetResumePath } from '@/lib/meet'
 
 const TAB_COUNT = 4
 const NAV_SWIPE_START_PX = 8
@@ -60,6 +62,7 @@ type SearchHit = {
 
 export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCatalog }: Props) {
   const t = useT()
+  const router = useRouter()
   const lang = useLocale()
   const { screenshotFor } = usePositionOverrides()
   const trackRef = useRef<HTMLDivElement>(null)
@@ -148,14 +151,29 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
     }
   }, [])
 
-  const scrollToPanel = useCallback((index: number) => {
-    const i = Math.max(0, Math.min(TAB_COUNT - 1, index))
-    setActiveIndex(i)
-    if (i === 0) {
-      // Сразу в обработчике tap — иначе iOS/Android не показывают клавиатуру после setTimeout/rAF
-      searchInputRef.current?.focus()
-    }
-  }, [])
+  const tryResumeActiveMeet = useCallback(() => {
+    const path = getActiveMeetResumePath()
+    if (!path) return false
+    router.push(path)
+    return true
+  }, [router])
+
+  const scrollToPanel = useCallback(
+    (index: number) => {
+      const i = Math.max(0, Math.min(TAB_COUNT - 1, index))
+      if (i === 2 && tryResumeActiveMeet()) return
+      setActiveIndex(i)
+      if (i === 0) {
+        // Сразу в обработчике tap — иначе iOS/Android не показывают клавиатуру после setTimeout/rAF
+        searchInputRef.current?.focus()
+      }
+    },
+    [tryResumeActiveMeet],
+  )
+
+  useEffect(() => {
+    if (activeIndex === 2) tryResumeActiveMeet()
+  }, [activeIndex, tryResumeActiveMeet])
 
   useEffect(() => {
     const dragOffsetFor = (start: NonNullable<typeof navSwipeStartRef.current>, dx: number) => {
@@ -456,6 +474,20 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
             <p className="mt-2 max-w-sm text-sm leading-relaxed text-[#888]">
               {t('home.tacticsTab.hint')}
             </p>
+            <p className="mt-3 max-w-sm text-sm text-[#666]">{t('home.teamCta.description')}</p>
+            <button
+              type="button"
+              onClick={() => router.push('/team?create=1')}
+              className="mt-6 flex h-14 w-full max-w-sm items-center justify-center rounded-xl bg-[#F0B429] text-base font-bold text-black"
+            >
+              {t('home.teamCta.create')}
+            </button>
+            <Link
+              href="/team"
+              className="mt-3 flex h-12 w-full max-w-sm items-center justify-center rounded-xl border border-[#333] text-sm font-semibold text-[#ccc]"
+            >
+              {t('team.join')}
+            </Link>
           </div>
         </section>
 
