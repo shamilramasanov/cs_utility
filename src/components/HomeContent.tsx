@@ -180,13 +180,23 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
   )
 
   useEffect(() => {
+    const commitDistanceFor = (width: number) =>
+      Math.max(NAV_SWIPE_COMMIT_PX, width * NAV_SWIPE_COMMIT_RATIO)
+
+    const shouldResumeTacticsSwipe = (
+      start: NonNullable<typeof navSwipeStartRef.current>,
+      dx: number,
+    ) => {
+      const resumePath = resumePathRef.current
+      if (!resumePath || start.activeIndex !== 1 || dx >= 0) return false
+      return -dx >= commitDistanceFor(start.width)
+    }
+
     const dragOffsetFor = (start: NonNullable<typeof navSwipeStartRef.current>, dx: number) => {
       const resumePath = resumePathRef.current
       if (resumePath && start.activeIndex === 1 && dx < 0) {
-        const commitDistance = Math.max(NAV_SWIPE_COMMIT_PX, start.width * NAV_SWIPE_COMMIT_RATIO)
         const raw = Math.max(dx, -start.width)
-        if (raw < -commitDistance) return -commitDistance * 0.2
-        return raw * 0.2
+        return raw * 0.32
       }
       const hasPrev = start.activeIndex > 0
       const hasNext = start.activeIndex < TAB_COUNT - 1
@@ -219,16 +229,17 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
         return
       }
 
+      if (shouldResumeTacticsSwipe(start, dx)) {
+        settleHomeTrack(start.activeIndex)
+        router.push(resumePathRef.current!)
+        return
+      }
+
       const offset = dragOffsetFor(start, dx)
-      const commitDistance = Math.max(NAV_SWIPE_COMMIT_PX, start.width * NAV_SWIPE_COMMIT_RATIO)
+      const commitDistance = commitDistanceFor(start.width)
       const next = offset < -commitDistance ? start.activeIndex + 1 : offset > commitDistance ? start.activeIndex - 1 : start.activeIndex
       if (next < 0 || next >= TAB_COUNT || next === start.activeIndex) {
         settleHomeTrack(start.activeIndex)
-        return
-      }
-      if (next === 2 && resumePathRef.current) {
-        settleHomeTrack(start.activeIndex)
-        router.push(resumePathRef.current)
         return
       }
       settleHomeTrack(next)
@@ -272,19 +283,15 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
         setHomeTrackTransform(start.activeIndex, 0, 'none')
       }
       if (e.cancelable) e.preventDefault()
-      const offset = dragOffsetFor(start, dx)
-      const resumePath = resumePathRef.current
-      if (resumePath && start.dragging && start.activeIndex === 1) {
-        const commitDistance = Math.max(NAV_SWIPE_COMMIT_PX, start.width * NAV_SWIPE_COMMIT_RATIO)
-        if (offset < -commitDistance) {
-          navSwipeStartRef.current = null
-          unlockHorizontalSwipeScroll()
-          settleHomeTrack(start.activeIndex)
-          router.push(resumePath)
-          return
-        }
+      if (start.dragging && shouldResumeTacticsSwipe(start, dx)) {
+        const resumePath = resumePathRef.current!
+        navSwipeStartRef.current = null
+        unlockHorizontalSwipeScroll()
+        settleHomeTrack(start.activeIndex)
+        router.push(resumePath)
+        return
       }
-      scheduleHomeDragFrame(start.activeIndex, offset)
+      scheduleHomeDragFrame(start.activeIndex, dragOffsetFor(start, dx))
     }
 
     const onPointerUpCapture = (e: PointerEvent) => {
