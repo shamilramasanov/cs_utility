@@ -12,7 +12,7 @@ import MeetSessionToolbar from './MeetSessionToolbar'
 import { MEET_MAP_PANEL_CLASS } from './meet-session-layout'
 import BottomSheet from '@/components/BottomSheet'
 import { useMeetSession } from '@/context/MeetSessionContext'
-import { usePlanTabSwipe } from '@/hooks/usePlanTabSwipe'
+import { useHorizontalPanelSwipe } from '@/hooks/useHorizontalPanelSwipe'
 import { useT, type TranslationKey } from '@/i18n'
 
 const BOTTOM_TAB_H = '4.5rem'
@@ -49,8 +49,17 @@ export default function RolePlanView({
   const meta = roleMeta(myRole)
   const viewMeta = viewRole === 'all' ? null : roleMeta(viewRole)
   const [tab, setTab] = useState<'text' | 'map'>('map')
-  const contentRef = useRef<HTMLDivElement>(null)
-  usePlanTabSwipe(contentRef, tab, setTab)
+  const panelIndex = tab === 'text' ? 0 : 1
+  const swipeContainerRef = useRef<HTMLDivElement>(null)
+  const planTrackRef = useRef<HTMLDivElement>(null)
+  const { trackStyle, panelStyle, goToPanel } = useHorizontalPanelSwipe({
+    panelCount: 2,
+    activeIndex: panelIndex,
+    onActiveIndexChange: (i) => setTab(i === 0 ? 'text' : 'map'),
+    containerRef: swipeContainerRef,
+    trackRef: planTrackRef,
+    excludeSelector: '[data-plan-swipe-ignore]',
+  })
 
   const plan =
     tactic.role_plans.find((p) => p.role === myRole) ??
@@ -152,31 +161,46 @@ export default function RolePlanView({
         }
       />
 
-      <div ref={contentRef} className={`flex min-h-0 flex-1 flex-col touch-pan-y ${bottomPad}`}>
-        {tab === 'map' ? (
-          <div className={MEET_MAP_PANEL_CLASS}>
-            <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#262626] bg-[#121212]">
-              <TacticMapView tactic={tactic} viewRole={viewRole} />
+      <div
+        ref={swipeContainerRef}
+        className={`flex min-h-0 flex-1 flex-col overflow-hidden touch-pan-y ${bottomPad}`}
+      >
+        <div ref={planTrackRef} className="flex h-full min-h-0 shrink-0" style={trackStyle}>
+          <section
+            className="flex min-h-0 shrink-0 flex-col"
+            style={panelStyle}
+            aria-hidden={panelIndex !== 0}
+          >
+            <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-app-screen py-3">
+              <div className="space-y-3">
+                {steps.map((step) => (
+                  <StepCard
+                    key={step.id}
+                    step={step}
+                    roleColor={meta.color}
+                    onOpenLineup={
+                      step.grenade_id
+                        ? () => openLineup(step.grenade_id!, step)
+                        : undefined
+                    }
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-app-screen py-3">
-            <div className="space-y-3">
-              {steps.map((step) => (
-                <StepCard
-                  key={step.id}
-                  step={step}
-                  roleColor={meta.color}
-                  onOpenLineup={
-                    step.grenade_id
-                      ? () => openLineup(step.grenade_id!, step)
-                      : undefined
-                  }
-                />
-              ))}
+          </section>
+
+          <section
+            className="flex min-h-0 shrink-0 flex-col"
+            style={panelStyle}
+            aria-hidden={panelIndex !== 1}
+          >
+            <div className={MEET_MAP_PANEL_CLASS}>
+              <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#262626] bg-[#121212]">
+                <TacticMapView tactic={tactic} viewRole={viewRole} />
+              </div>
             </div>
-          </div>
-        )}
+          </section>
+        </div>
       </div>
 
       {tab === 'text' && stickyStep?.grenade_id && !lineupGrenade && (
@@ -195,7 +219,7 @@ export default function RolePlanView({
         </div>
       )}
 
-      <PlanViewTabs tab={tab} onTab={setTab} />
+      <PlanViewTabs tab={tab} onTab={(next) => goToPanel(next === 'text' ? 0 : 1)} />
 
       {lineupGrenade && (
         <div className="fixed inset-0 z-[100] flex flex-col bg-[#0d0d0d]" data-plan-swipe-ignore>

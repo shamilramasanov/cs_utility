@@ -151,32 +151,43 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
     }
   }, [])
 
-  const tryResumeActiveMeet = useCallback(() => {
+  const resumePathRef = useRef<string | null>(null)
+  const [hasActiveMeet, setHasActiveMeet] = useState(false)
+
+  useEffect(() => {
     const path = getActiveMeetResumePath()
-    if (!path) return false
-    router.push(path)
-    return true
+    resumePathRef.current = path
+    setHasActiveMeet(Boolean(path))
+    if (path) router.prefetch(path)
   }, [router])
 
   const scrollToPanel = useCallback(
     (index: number) => {
       const i = Math.max(0, Math.min(TAB_COUNT - 1, index))
-      if (i === 2 && tryResumeActiveMeet()) return
+      if (i === 2) {
+        const path = resumePathRef.current ?? getActiveMeetResumePath()
+        if (path) {
+          router.push(path)
+          return
+        }
+      }
       setActiveIndex(i)
       if (i === 0) {
-        // Сразу в обработчике tap — иначе iOS/Android не показывают клавиатуру после setTimeout/rAF
         searchInputRef.current?.focus()
       }
     },
-    [tryResumeActiveMeet],
+    [router],
   )
 
   useEffect(() => {
-    if (activeIndex === 2) tryResumeActiveMeet()
-  }, [activeIndex, tryResumeActiveMeet])
-
-  useEffect(() => {
     const dragOffsetFor = (start: NonNullable<typeof navSwipeStartRef.current>, dx: number) => {
+      const resumePath = resumePathRef.current
+      if (resumePath && start.activeIndex === 1 && dx < 0) {
+        const commitDistance = Math.max(NAV_SWIPE_COMMIT_PX, start.width * NAV_SWIPE_COMMIT_RATIO)
+        const raw = Math.max(dx, -start.width)
+        if (raw < -commitDistance) return -commitDistance * 0.2
+        return raw * 0.2
+      }
       const hasPrev = start.activeIndex > 0
       const hasNext = start.activeIndex < TAB_COUNT - 1
       const edgeDamped = (dx > 0 && !hasPrev) || (dx < 0 && !hasNext)
@@ -215,8 +226,14 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
         settleHomeTrack(start.activeIndex)
         return
       }
+      if (next === 2 && resumePathRef.current) {
+        settleHomeTrack(start.activeIndex)
+        router.push(resumePathRef.current)
+        return
+      }
       settleHomeTrack(next)
-      scrollToPanel(next)
+      setActiveIndex(next)
+      if (next === 0) searchInputRef.current?.focus()
     }
 
     const onPointerDownCapture = (e: PointerEvent) => {
@@ -255,7 +272,19 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
         setHomeTrackTransform(start.activeIndex, 0, 'none')
       }
       if (e.cancelable) e.preventDefault()
-      scheduleHomeDragFrame(start.activeIndex, dragOffsetFor(start, dx))
+      const offset = dragOffsetFor(start, dx)
+      const resumePath = resumePathRef.current
+      if (resumePath && start.dragging && start.activeIndex === 1) {
+        const commitDistance = Math.max(NAV_SWIPE_COMMIT_PX, start.width * NAV_SWIPE_COMMIT_RATIO)
+        if (offset < -commitDistance) {
+          navSwipeStartRef.current = null
+          unlockHorizontalSwipeScroll()
+          settleHomeTrack(start.activeIndex)
+          router.push(resumePath)
+          return
+        }
+      }
+      scheduleHomeDragFrame(start.activeIndex, offset)
     }
 
     const onPointerUpCapture = (e: PointerEvent) => {
@@ -282,7 +311,7 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
       window.removeEventListener('pointerup', onPointerUpCapture, true)
       window.removeEventListener('pointercancel', onPointerCancelCapture, true)
     }
-  }, [cancelNavRaf, scheduleHomeDragFrame, scrollToPanel, setHomeTrackTransform, settleHomeTrack])
+  }, [cancelNavRaf, router, scheduleHomeDragFrame, setHomeTrackTransform, settleHomeTrack])
 
   const navLabels = useMemo(
     () => [
@@ -466,29 +495,33 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
         </section>
 
         <section className="flex h-full min-h-0 shrink-0 grow-0 flex-col" style={homePanelStyle} aria-hidden={activeIndex !== 2}>
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-app-screen pb-[calc(8.1rem+env(safe-area-inset-bottom,0px))] pt-8 text-center">
-            <span className="mb-3 text-4xl" aria-hidden>
-              ⚡
-            </span>
-            <h2 className="text-lg font-bold">{t('home.tacticsTab.title')}</h2>
-            <p className="mt-2 max-w-sm text-sm leading-relaxed text-[#888]">
-              {t('home.tacticsTab.hint')}
-            </p>
-            <p className="mt-3 max-w-sm text-sm text-[#666]">{t('home.teamCta.description')}</p>
-            <button
-              type="button"
-              onClick={() => router.push('/team?create=1')}
-              className="mt-6 flex h-14 w-full max-w-sm items-center justify-center rounded-xl bg-[#F0B429] text-base font-bold text-black"
-            >
-              {t('home.teamCta.create')}
-            </button>
-            <Link
-              href="/team"
-              className="mt-3 flex h-12 w-full max-w-sm items-center justify-center rounded-xl border border-[#333] text-sm font-semibold text-[#ccc]"
-            >
-              {t('team.join')}
-            </Link>
-          </div>
+          {hasActiveMeet ? (
+            <div className="min-h-0 flex-1 bg-[#0d0d0d]" aria-hidden />
+          ) : (
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-app-screen pb-[calc(8.1rem+env(safe-area-inset-bottom,0px))] pt-8 text-center">
+              <span className="mb-3 text-4xl" aria-hidden>
+                ⚡
+              </span>
+              <h2 className="text-lg font-bold">{t('home.tacticsTab.title')}</h2>
+              <p className="mt-2 max-w-sm text-sm leading-relaxed text-[#888]">
+                {t('home.tacticsTab.hint')}
+              </p>
+              <p className="mt-3 max-w-sm text-sm text-[#666]">{t('home.teamCta.description')}</p>
+              <button
+                type="button"
+                onClick={() => router.push('/team?create=1')}
+                className="mt-6 flex h-14 w-full max-w-sm items-center justify-center rounded-xl bg-[#F0B429] text-base font-bold text-black"
+              >
+                {t('home.teamCta.create')}
+              </button>
+              <Link
+                href="/team"
+                className="mt-3 flex h-12 w-full max-w-sm items-center justify-center rounded-xl border border-[#333] text-sm font-semibold text-[#ccc]"
+              >
+                {t('team.join')}
+              </Link>
+            </div>
+          )}
         </section>
 
         <section className="flex h-full min-h-0 shrink-0 grow-0 flex-col" style={homePanelStyle} aria-hidden={activeIndex !== 3}>
