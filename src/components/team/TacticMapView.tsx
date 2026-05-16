@@ -21,10 +21,39 @@ export default function TacticMapView({ tactic, viewRole }: Props) {
   const radarLayoutRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement>(null)
   const [imgLoaded, setImgLoaded] = useState(false)
+  const [imgFailed, setImgFailed] = useState(false)
   const box = useRadarImageBox(radarLayoutRef, imgRef, imgLoaded, 'center')
 
   useEffect(() => {
+    const img = imgRef.current
+    if (!img || !radarFile) return
+
     setImgLoaded(false)
+    setImgFailed(false)
+
+    const markLoaded = () => {
+      if (img.naturalWidth > 0) {
+        setImgLoaded(true)
+        setImgFailed(false)
+      }
+    }
+    const markFailed = () => {
+      setImgLoaded(false)
+      setImgFailed(true)
+    }
+
+    if (img.complete) {
+      if (img.naturalWidth > 0) markLoaded()
+      else markFailed()
+      return
+    }
+
+    img.addEventListener('load', markLoaded)
+    img.addEventListener('error', markFailed)
+    return () => {
+      img.removeEventListener('load', markLoaded)
+      img.removeEventListener('error', markFailed)
+    }
   }, [radarFile])
 
   const plansToShow = useMemo(() => {
@@ -60,17 +89,23 @@ export default function TacticMapView({ tactic, viewRole }: Props) {
       aria-label={mapData?.display_name ?? tactic.map}
     >
       {radarFile ? (
-        <img
-          ref={imgRef}
-          src={`/minimaps/${radarFile}`}
-          alt=""
-          className={`absolute inset-0 h-full w-full object-contain transition-opacity ${
-            imgLoaded ? 'opacity-100' : 'opacity-0'
-          }`}
-          style={{ objectPosition: radarImageObjectPosition('center') }}
-          draggable={false}
-          onLoad={() => setImgLoaded(true)}
-        />
+        <>
+          <img
+            ref={imgRef}
+            src={`/minimaps/${radarFile}`}
+            alt=""
+            className={`absolute inset-0 h-full w-full object-contain transition-opacity ${
+              imgLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+            style={{ objectPosition: radarImageObjectPosition('center') }}
+            draggable={false}
+          />
+          {imgFailed && (
+            <p className="absolute inset-0 flex items-center justify-center px-4 text-center text-sm text-[#888]">
+              Не удалось загрузить радар. Проверьте файл в public/minimaps/
+            </p>
+          )}
+        </>
       ) : (
         <p className="absolute inset-0 flex items-center justify-center text-sm text-[#666]">
           {t('common.nothingFound')}
