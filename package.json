@@ -5,9 +5,10 @@
   "scripts": {
     "dev": "next dev -H 0.0.0.0 --webpack",
     "dev:turbo": "next dev -H 0.0.0.0 --turbopack",
-    "build": "next build",
-    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "build": "opennextjs-cloudflare build",
+    "build:next": "next build",
+    "preview": "opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare deploy",
     "start": "next start",
     "lint": "eslint",
     "build:favicon": "node scripts/build-favicon.mjs",
