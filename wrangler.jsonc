@@ -21,5 +21,12 @@
   ],
   "images": {
     "binding": "IMAGES"
-  }
+  },
+  // Hyperdrive: npm run hyperdrive:create → вставьте id ниже (ускоряет Postgres с Workers)
+  // "hyperdrive": [
+  //   {
+  //     "binding": "HYPERDRIVE",
+  //     "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  //   }
+  // ]
 }

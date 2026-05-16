@@ -2,3 +2,6 @@
 NEXTJS_ENV=development
 DATABASE_PUBLIC_URL=postgresql://...
 ADMIN_SECRET=
+
+# Production (Cloudflare Workers): после `npm run hyperdrive:create` добавьте в wrangler.jsonc
+# binding HYPERDRIVE с id. DATABASE_PUBLIC_URL в Dashboard можно оставить для fallback.

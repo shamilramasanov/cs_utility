@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer'
 import { cache } from 'react'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import postgres, { type Sql } from 'postgres'
 
 /** Ключи JSON-контента редактора (одна строка на ключ в `editor_content`). */
@@ -22,13 +23,44 @@ function readEnv(name: string): string | undefined {
   return typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined
 }
 
-function connectionString(): string | null {
+/** Прямой URL (Vercel, `next dev`, скрипты с ПК). */
+function directConnectionString(): string | null {
   const pub = readEnv(envNameFromB64('REFUQUJBU0VfUFVCTElDX1VSTA=='))
   if (pub) return pub
   return readEnv(envNameFromB64('REFUQUJBU0VfVVJM')) ?? readEnv(envNameFromB64('UE9TVEdSRVNfVVJM')) ?? null
 }
 
-function postgresOptions() {
+/** Cloudflare Hyperdrive — пул на edge, без 5–12 с TLS до Railway на каждый запрос. */
+function hyperdriveConnectionString(): string | null {
+  try {
+    const hd = getCloudflareContext().env.HYPERDRIVE
+    const cs = hd?.connectionString
+    return typeof cs === 'string' && cs.trim() !== '' ? cs.trim() : null
+  } catch {
+    return null
+  }
+}
+
+type DbTarget = { url: string; viaHyperdrive: boolean }
+
+function resolveDbTarget(): DbTarget | null {
+  const hd = hyperdriveConnectionString()
+  if (hd) return { url: hd, viaHyperdrive: true }
+  const direct = directConnectionString()
+  if (direct) return { url: direct, viaHyperdrive: false }
+  return null
+}
+
+function postgresOptions(viaHyperdrive: boolean) {
+  if (viaHyperdrive) {
+    return {
+      max: 5,
+      idle_timeout: 20,
+      connect_timeout: 10,
+      fetch_types: false,
+      prepare: true,
+    }
+  }
   return {
     max: 1,
     idle_timeout: 5,
@@ -43,10 +75,10 @@ function postgresOptions() {
  * @see https://opennext.js.org/cloudflare/howtos/db
  */
 const getSql = cache((): Sql | null => {
-  const url = connectionString()
-  if (!url) return null
+  const target = resolveDbTarget()
+  if (!target) return null
   try {
-    return postgres(url, postgresOptions())
+    return postgres(target.url, postgresOptions(target.viaHyperdrive))
   } catch (e) {
     console.error('[editor-db] init', e)
     return null
@@ -54,7 +86,11 @@ const getSql = cache((): Sql | null => {
 })
 
 export function isEditorDatabaseEnabled(): boolean {
-  return Boolean(connectionString())
+  return resolveDbTarget() != null
+}
+
+export function isEditorDatabaseViaHyperdrive(): boolean {
+  return hyperdriveConnectionString() != null
 }
 
 /** Все ключи одним запросом (для /api/home/bootstrap — один round-trip к Railway). */
@@ -110,7 +146,11 @@ export const editorDbGetJson = cache(async (key: EditorContentKey): Promise<unkn
 
 export async function editorDbSetJson(key: EditorContentKey, payload: unknown): Promise<void> {
   const sql = getSql()
-  if (!sql) throw new Error('Задай DATABASE_PUBLIC_URL или DATABASE_URL / POSTGRES_URL')
+  if (!sql) {
+    throw new Error(
+      'Задай Hyperdrive (wrangler) или DATABASE_PUBLIC_URL / DATABASE_URL для записи в БД',
+    )
+  }
   const json = sql.json(payload as Parameters<Sql['json']>[0])
   await sql`
     INSERT INTO editor_content (key, payload, updated_at)

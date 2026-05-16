@@ -13,7 +13,8 @@
     "lint": "eslint",
     "build:favicon": "node scripts/build-favicon.mjs",
     "seed:editor-db": "node --env-file=.env scripts/seed-editor-content.mjs",
-    "db:schema": "node --env-file=.env scripts/apply-editor-schema.mjs"
+    "db:schema": "node --env-file=.env scripts/apply-editor-schema.mjs",
+    "hyperdrive:create": "node scripts/create-hyperdrive.mjs"
   },
   "dependencies": {
     "@swc/helpers": "0.5.15",
