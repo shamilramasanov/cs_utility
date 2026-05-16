@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { cache } from 'react'
 import type { PositionZonesFile, PositionZone } from '@/types/positions'
 import { EDITOR_KEYS, editorDbGetJson, editorDbSetJson, isEditorDatabaseEnabled } from '@/lib/editor-db'
 import { readJsonFromRepo } from '@/lib/safe-fs-json'
@@ -26,13 +27,13 @@ function normalize(raw: unknown): PositionZonesFile {
   return { maps: data.maps ?? {} }
 }
 
-export async function readPositionZonesFile(): Promise<PositionZonesFile> {
+export const readPositionZonesFile = cache(async (): Promise<PositionZonesFile> => {
   if (isEditorDatabaseEnabled()) {
     const row = await editorDbGetJson(EDITOR_KEYS.position_zones)
     if (row != null) return normalize(row)
   }
   return readFromDisk()
-}
+})
 
 export async function writePositionZonesFile(data: PositionZonesFile): Promise<void> {
   if (isEditorDatabaseEnabled()) {

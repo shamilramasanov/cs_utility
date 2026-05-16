@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { cache } from 'react'
 import type { PositionOverridesFile } from '@/types/positions'
 import { EDITOR_KEYS, editorDbGetJson, editorDbSetJson, isEditorDatabaseEnabled } from '@/lib/editor-db'
 import { readJsonFromRepo } from '@/lib/safe-fs-json'
@@ -26,13 +27,13 @@ function normalizeOverrides(raw: unknown): PositionOverridesFile {
   return { overrides: d.overrides && typeof d.overrides === 'object' ? d.overrides : {} }
 }
 
-export async function readPositionOverridesFile(): Promise<PositionOverridesFile> {
+export const readPositionOverridesFile = cache(async (): Promise<PositionOverridesFile> => {
   if (isEditorDatabaseEnabled()) {
     const row = await editorDbGetJson(EDITOR_KEYS.position_overrides)
     if (row != null) return normalizeOverrides(row)
   }
   return readPositionOverridesFromDisk()
-}
+})
 
 export async function writePositionOverridesFile(data: PositionOverridesFile): Promise<void> {
   if (isEditorDatabaseEnabled()) {

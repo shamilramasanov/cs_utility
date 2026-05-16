@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
 import { readJsonFromRepo } from '@/lib/safe-fs-json'
 import type { CustomLineupsFile, Grenade } from '@/types'
@@ -38,13 +39,13 @@ function normalizeCustomLineupsFile(raw: unknown): CustomLineupsFile {
 }
 
 /** Слияние кастомных раскидок: при наличии БД — строка `custom_lineups`, иначе JSON в репо. */
-export async function readCustomLineupsFile(): Promise<CustomLineupsFile> {
+export const readCustomLineupsFile = cache(async (): Promise<CustomLineupsFile> => {
   if (isEditorDatabaseEnabled()) {
     const row = await editorDbGetJson(EDITOR_KEYS.custom_lineups)
     if (row != null) return normalizeCustomLineupsFile(row)
   }
   return readCustomLineupsFromDisk()
-}
+})
 
 export async function writeCustomLineupsFile(data: CustomLineupsFile): Promise<void> {
   if (isEditorDatabaseEnabled()) {

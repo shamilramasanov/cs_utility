@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { cache } from 'react'
 import type { MapPosition } from '@/types/positions'
 import { EDITOR_KEYS, editorDbGetJson, editorDbSetJson, isEditorDatabaseEnabled } from '@/lib/editor-db'
 import { readJsonFromRepo } from '@/lib/safe-fs-json'
@@ -30,13 +31,15 @@ function normalize(raw: unknown): PositionCatalogExtensionsFile {
   return { positions: Array.isArray(data.positions) ? data.positions : [] }
 }
 
-export async function readPositionCatalogExtensionsFile(): Promise<PositionCatalogExtensionsFile> {
-  if (isEditorDatabaseEnabled()) {
-    const row = await editorDbGetJson(EDITOR_KEYS.position_catalog_extensions)
-    if (row != null) return normalize(row)
-  }
-  return readFromDisk()
-}
+export const readPositionCatalogExtensionsFile = cache(
+  async (): Promise<PositionCatalogExtensionsFile> => {
+    if (isEditorDatabaseEnabled()) {
+      const row = await editorDbGetJson(EDITOR_KEYS.position_catalog_extensions)
+      if (row != null) return normalize(row)
+    }
+    return readFromDisk()
+  },
+)
 
 export async function writePositionCatalogExtensionsFile(
   data: PositionCatalogExtensionsFile,

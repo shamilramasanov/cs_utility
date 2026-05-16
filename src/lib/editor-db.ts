@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer'
 import { cache } from 'react'
-import type { Sql } from 'postgres'
+import postgres, { type Sql } from 'postgres'
 
 /** Ключи JSON-контента редактора (одна строка на ключ в `editor_content`). */
 export const EDITOR_KEYS = {
@@ -40,14 +40,12 @@ function postgresOptions() {
 
 /**
  * Один клиент на HTTP-запрос (react cache), не глобальный singleton.
- * Глобальный пул на Workers даёт 1101 / «I/O on behalf of a different request».
  * @see https://opennext.js.org/cloudflare/howtos/db
  */
-const getSql = cache(async (): Promise<Sql | null> => {
+const getSql = cache((): Sql | null => {
   const url = connectionString()
   if (!url) return null
   try {
-    const { default: postgres } = await import('postgres')
     return postgres(url, postgresOptions())
   } catch (e) {
     console.error('[editor-db] init', e)
@@ -59,9 +57,9 @@ export function isEditorDatabaseEnabled(): boolean {
   return Boolean(connectionString())
 }
 
-/** `null` — строки нет (читаем с диска из репо). */
-export async function editorDbGetJson(key: EditorContentKey): Promise<unknown | null> {
-  const sql = await getSql()
+/** `null` — строки нет (читаем с диска из репо). Кэш по ключу на один запрос. */
+export const editorDbGetJson = cache(async (key: EditorContentKey): Promise<unknown | null> => {
+  const sql = getSql()
   if (!sql) return null
   try {
     const rows = await sql<{ payload: unknown }[]>`
@@ -73,10 +71,10 @@ export async function editorDbGetJson(key: EditorContentKey): Promise<unknown | 
     console.error('[editor-db] GET', key, e)
     return null
   }
-}
+})
 
 export async function editorDbSetJson(key: EditorContentKey, payload: unknown): Promise<void> {
-  const sql = await getSql()
+  const sql = getSql()
   if (!sql) throw new Error('Задай DATABASE_PUBLIC_URL или DATABASE_URL / POSTGRES_URL')
   const json = sql.json(payload as Parameters<Sql['json']>[0])
   await sql`
