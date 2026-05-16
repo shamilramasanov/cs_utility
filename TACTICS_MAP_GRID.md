@@ -2,7 +2,7 @@
 
 > Документ-идея: как загружать **любую** новую карту и строить тактики в **ручном** и **AI-авто** режиме без переписывания кода под каждый `de_*`.
 >
-> Связанные файлы: `PLAN_TEAM_TACTICS.md`, `UI_UX_TACTICS_VISION.md`, `src/data/maps.json`, `src/types/tactics.ts`, `TacticMapView.tsx`.
+> Связанные файлы: `TACTICS_ADMIN_AND_AI.md` (админка, custom/preset, AI-live), `PLAN_TEAM_TACTICS.md`, `UI_UX_TACTICS_VISION.md`, `src/data/maps.json`, `src/types/tactics.ts`, `TacticMapView.tsx`.
 
 ---
 
@@ -12,7 +12,7 @@
 |----------|-------------|
 | `MapPoint { x, y }` в диапазоне **0..1** | Работает только если радар вписан в `object-fit: contain` и все слои совпадают |
 | `maps.json`: `calibration` (pos_x, pos_y, scale) | Есть для раскидок, **не используется** в тактиках |
-| Радар: `/minimaps/{file}.png` | Нужен ручной PNG на диск; без файла карта пустая |
+| Радар: `/minimaps/{file}.png` | Растр — при зуме мылится; **целевой формат — SVG** |
 | Тактики в `tactics.json` | Жёстко привязаны к `de_mirage` и ручным координатам |
 | AI | Нет единого формата «опиши раунд → получи path на любой карте» |
 
@@ -28,6 +28,23 @@
    - **Авто (AI)** — текст/voice брифинг → модель возвращает структуру `Tactic` в координатах сетки.
 3. **Один источник правды** для раскидок и тактик: нормализованные координаты + калибровка мира CS2.
 4. **Слои** (Nuke lower/main) — переключение без потери координат внутри слоя.
+5. **SVG-радары** — векторные карты (перерисованные вами), зум без потери качества на телефоне и десктопе.
+
+---
+
+## 2.1. Почему SVG, а не PNG
+
+| | PNG (сейчас) | SVG (цель) |
+|---|--------------|------------|
+| Зум в `MapView` | Пиксели растягиваются | Контур остаётся чётким |
+| Вес | Большие файлы (>25 MB ломают деплой Workers) | Обычно десятки–сотни KB |
+| Crop | Пустые поля вокруг радара | `viewBox` = игровая область без полей |
+| Сетка | Рисуем поверх в HTML/SVG overlay | Можно встроить в тот же SVG (слой grid) |
+| Загрузка | Файл в `public/minimaps/` | Upload → R2 или D1 + URL в профиле |
+
+**Важно:** текущий код уже рендерит радар через `<img src="/minimaps/…">`. Для **`.svg` менять движок не обязательно** — достаточно положить файл и указать имя в `maps.json` / `MapGridProfile`. Зум/pan в `MapView` масштабирует контейнер, SVG остаётся резким.
+
+Позже (Фаза 1b): опциональный режим **inline SVG** (`<object>` / `dangerouslySetInnerHTML` с санитизацией) — для смены цветов зон, тёмной темы, сетки внутри файла.
 
 ---
 
@@ -59,14 +76,22 @@ export interface GridPoint {
 }
 
 /** Описание карты для редактора и AI. */
+export type RadarAssetFormat = 'svg' | 'png' | 'webp'
+
 export interface MapGridProfile {
   map_id: string
   radar: {
+    /** Имя файла, напр. `de_mirage.svg` */
     file: string
-    width: number   // натуральный размер PNG
+    format: RadarAssetFormat
+    /** Для SVG: viewBox "0 0 W H" → width/height логические единицы */
+    width: number
     height: number
-    /** Прямоугольник «игровой области» внутри PNG (обрезка пустых полей). */
-    crop: { x: number; y: number; w: number; h: number } // 0..1 относительно PNG
+    view_box?: string
+    /** Прямоугольник игровой области (0..1). Для SVG с правильным viewBox часто {0,0,1,1}. */
+    crop: { x: number; y: number; w: number; h: number }
+    /** После загрузки в R2/CDN — иначе `/minimaps/{file}` */
+    public_url?: string
   }
   calibration: {
     pos_x: number
@@ -129,45 +154,88 @@ function pointToCell(p: GridPoint, cols: number, rows: number) {
 }
 ```
 
-### 4.4. Crop радара
+### 4.4. Crop и viewBox (SVG)
 
-Многие PNG имеют пустые поля. В `MapGridProfile.radar.crop` задаём «активный» прямоугольник:
+**SVG (рекомендуется):** в Figma/Illustrator экспорт с `viewBox`, совпадающим с игровой картой (без лишних полей). Тогда:
 
-- Координаты Layer B считаются **относительно crop**, не всего файла.
-- `useRadarImageBox` уже даёт `box` на экране — нужно согласовать с crop при отрисовке overlay.
+```json
+"crop": { "x": 0, "y": 0, "w": 1, "h": 1 }
+```
 
-**MVP crop:** вручную в админке «потянуть углы» → сохранить в D1 `map_profiles` JSON.
+Координаты Layer B = доля от **viewBox**, стабильны при любом зуме UI.
 
-**Auto crop (позже):** AI vision по PNG → bounding box игровой области.
+**PNG (legacy):** crop вручную в админке — 4 угла вокруг «активной» области.
+
+`useRadarImageBox` даёт `box` на экране; overlay (маршруты, маркеры) рисуется в Layer B → px через `box`.
 
 ---
 
-## 5. Загрузка новой карты (onboarding)
+## 5. Загрузка карты: SVG-first
 
 ```mermaid
 flowchart LR
-  A[PNG радар] --> B[Админ: crop + grid]
-  B --> C[MapGridProfile в D1]
-  C --> D[Спавны / sites — клик или AI]
-  D --> E[Карта в тактиках и раскидках]
+  A[SVG радар] --> B[Санитизация + метаданные]
+  B --> C[Upload R2 / public]
+  C --> D[MapGridProfile в D1]
+  D --> E[crop / viewBox + grid 16×16]
+  E --> F[spawns / sites]
+  F --> G[тактики + раскидки + зум]
 ```
 
-### Шаги для пользователя (капитан / админ)
+### Требования к вашим SVG
 
-1. Загрузить `radar.png` (и при необходимости `lower.png`).
-2. Указать display name, `map_id` (`de_custom_arena` или официальный id).
-3. **Калибровка crop** — 4 угла игровой зоны.
-4. Расставить **CT/T spawn** и **сайты** (клик на карте или импорт из шаблона похожей карты).
-5. (Опционально) **AI assist:** «это похоже на mirage» → копировать spawns/sites с масштабированием.
+1. **Один слой карты** на файл (отдельный SVG для lower Nuke).
+2. **`viewBox`** задан явно, например `viewBox="0 0 1024 1024"`.
+3. **Без** `<script>`, внешних ссылок на чужие домены, `onload=` (безопасность при upload).
+4. **Ориентация** как у текущих радаров (север сверху) — чтобы старые `path[]` в tactics.json не переворачивались.
+5. Желательно: **векторные зоны** (A/mid/B) отдельными `<path id="zone_a">` — позже подсветка в UI.
+
+### Быстрый старт (без админки, сейчас)
+
+1. Положить файлы в `public/minimaps/`, например `de_mirage.svg`.
+2. В `src/data/maps.json` для карты:
+   ```json
+   "radar": "de_mirage.svg",
+   "layers": [{ "id": "main", "label": "Основной", "file": "de_mirage.svg" }]
+   ```
+3. Задеплоить — `MapView`, `TacticMapView`, превью на главной подхватят `.svg` автоматически.
+
+Координаты 0..1 из существующих тактик **не меняются**, если пропорции и ориентация SVG совпадают с прежним PNG.
+
+### Загрузка через админку (Фаза 1)
+
+| Шаг | Действие |
+|-----|----------|
+| 1 | `POST /api/admin/map-assets` — multipart SVG, max ~2 MB |
+| 2 | Сервер: SVGO + strip scripts → R2 `maps/{map_id}/radar.svg` |
+| 3 | Парсинг `viewBox` → `width`, `height` в профиль |
+| 4 | UI: превью + drag crop (если viewBox с полями) + клик spawns/sites |
+| 5 | `PUT` профиля в D1 `map_profiles` |
 
 ### Хранение
 
 ```ts
-// D1 / editor_content key
+// D1
 'map_profiles' → Record<string, MapGridProfile>
+
+// R2 (опционально, для больших библиотек / версий)
+maps/{map_id}/v{version}/radar.svg
+maps/{map_id}/v{version}/lower.svg
 ```
 
-Официальные карты — seed из `maps.json` + minimaps. Кастом — только через админку.
+Официальный набор: ваши перерисованные SVG в репо или R2. Старые PNG — fallback до полной замены.
+
+### URL в коде (единая точка)
+
+```ts
+// src/lib/radar-asset.ts (план)
+export function radarAssetUrl(file: string, profile?: MapGridProfile): string {
+  if (profile?.radar.public_url) return profile.radar.public_url
+  return `/minimaps/${file}`
+}
+```
+
+Использовать в `MapView`, `TacticMapView`, `HomeContent`, админке.
 
 ---
 
@@ -269,14 +337,15 @@ flowchart LR
 ### Фаза 0 — стабильность (сейчас)
 
 - [x] Фикс `TacticMapView` (кэш изображения, ошибка загрузки).
-- [ ] Minimaps в репо / CI assets для всех competitive карт.
+- [ ] Подключить **ваши SVG** в `public/minimaps/` + обновить `maps.json` (по одной карте или пакетом).
 
-### Фаза 1 — сетка и профиль карты
+### Фаза 1 — SVG + сетка и профиль
 
-- [ ] Типы `MapGridProfile`, `GridPoint`.
+- [ ] `radarAssetUrl()` + `format: 'svg' | 'png'` в типах.
+- [ ] Типы `MapGridProfile`, `GridPoint`; парсинг `viewBox` при upload.
 - [ ] `GridOverlay` в `TacticMapView` (debug toggle).
-- [ ] Админ-страница: crop + spawns для одной карты.
-- [ ] D1 key `map_profiles`, seed из `maps.json`.
+- [ ] Админ: upload SVG → preview → spawns/sites → D1 `map_profiles`.
+- [ ] R2 для ассетов карт (опционально; иначе git + `public/minimaps/`).
 
 ### Фаза 2 — ручной редактор тактик
 
@@ -292,9 +361,9 @@ flowchart LR
 
 ### Фаза 4 — любая новая карта
 
-- [ ] Wizard загрузки PNG + auto-crop (vision).
-- [ ] Импорт профиля с похожей карты.
-- [ ] Документация для мапмейкеров.
+- [ ] Wizard: upload SVG + авто-`viewBox` + клон spawns с похожей карты.
+- [ ] Импорт/экспорт профиля JSON.
+- [ ] Гайд для мапмейкеров (Figma → SVG → UTILITY).
 
 ---
 
@@ -324,11 +393,13 @@ flowchart LR
 2. **Хранить tactics** только в D1 или дублировать preset в JSON для offline?
 3. **Realtime** (синхрон карты у всех в meet) — Phase T1 Supabase или Cloudflare Durable Objects?
 4. **Локализация** подписей зон в AI-промпте (ru/en)?
+5. **Inline SVG vs `<img>`** — нужна ли смена цвета зон в тёмной теме или достаточно ваших готовых цветов в файле?
+6. **Версионирование SVG** — при правке карты сохранять v2 URL или перезаписывать (кэш CDN)?
 
 ---
 
 ## 13. Резюме для команды
 
-> Загружаем радар → получаем **профиль карты с сеткой** → в **ручном** редакторе рисуем тактику по клеткам → или **AI** набрасывает черновик по тексту брифинга → капитан правит → команда видит ту же карту в `/team` без пропаданий и с быстрым переходом к раскидкам.
+> Загружаем **SVG-радар** → профиль с **viewBox + сеткой** → тактики вручную или через AI → зум без мыла → те же координаты на раскидках и в `/team`.
 
-Следующий практический шаг после этого документа: **Фаза 1** — `MapGridProfile` + overlay сетки в `TacticMapView` + админ crop для Mirage как эталон.
+**Следующий шаг:** положить перерисованные `de_*.svg` в `public/minimaps/`, обновить `maps.json`, проверить зум на Mirage; параллельно — админ upload + `map_profiles` в D1.
