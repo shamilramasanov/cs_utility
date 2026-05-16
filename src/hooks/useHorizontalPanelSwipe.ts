@@ -2,11 +2,17 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
 import { lockHorizontalSwipeScroll, unlockHorizontalSwipeScroll } from '@/lib/horizontal-swipe-scroll-lock'
+import {
+  HORIZONTAL_PANEL_TRACK_TRANSITION,
+  setHorizontalPanelTrackTransform,
+} from '@/lib/horizontal-panel-track'
 
-const SWIPE_START_PX = 8
-const SWIPE_COMMIT_PX = 36
-const SWIPE_COMMIT_RATIO = 0.22
-export const PANEL_TRACK_TRANSITION = 'transform 320ms cubic-bezier(0.22, 0.72, 0.18, 1)'
+const SWIPE_START_PX = 6
+const SWIPE_COMMIT_PX = 28
+const SWIPE_COMMIT_RATIO = 0.18
+
+/** @deprecated используйте HORIZONTAL_PANEL_TRACK_TRANSITION */
+export const PANEL_TRACK_TRANSITION = HORIZONTAL_PANEL_TRACK_TRANSITION
 
 interface Options {
   panelCount: number
@@ -27,8 +33,7 @@ export function useHorizontalPanelSwipe({
 }: Options) {
   const activeIndexRef = useRef(activeIndex)
   const panelWidthPercent = 100 / panelCount
-  const navRafRef = useRef<number | null>(null)
-  const navPendingOffsetRef = useRef(0)
+  const draggingRef = useRef(false)
   const navSwipeStartRef = useRef<{
     x: number
     y: number
@@ -38,58 +43,64 @@ export function useHorizontalPanelSwipe({
   } | null>(null)
   const ignoreClickRef = useRef(false)
 
-  useLayoutEffect(() => {
-    activeIndexRef.current = activeIndex
-  }, [activeIndex])
+  const viewportWidth = useCallback(
+    () => containerRef.current?.clientWidth || window.innerWidth || 1,
+    [containerRef],
+  )
 
   const setTrackTransform = useCallback(
     (index: number, offsetPx: number, transition?: string) => {
-      const el = trackRef.current
-      if (!el) return
-      if (transition !== undefined) el.style.transition = transition
-      el.style.transform = `translate3d(calc(${-index * panelWidthPercent}% + ${offsetPx}px), 0, 0)`
+      setHorizontalPanelTrackTransform(
+        trackRef.current,
+        index,
+        viewportWidth(),
+        offsetPx,
+        transition,
+      )
     },
-    [panelWidthPercent, trackRef],
-  )
-
-  const cancelNavRaf = useCallback(() => {
-    if (navRafRef.current === null) return
-    window.cancelAnimationFrame(navRafRef.current)
-    navRafRef.current = null
-  }, [])
-
-  const scheduleDragFrame = useCallback(
-    (index: number, offsetPx: number) => {
-      navPendingOffsetRef.current = offsetPx
-      if (navRafRef.current !== null) return
-      navRafRef.current = window.requestAnimationFrame(() => {
-        navRafRef.current = null
-        setTrackTransform(index, navPendingOffsetRef.current, 'none')
-      })
-    },
-    [setTrackTransform],
+    [trackRef, viewportWidth],
   )
 
   const settleTrack = useCallback(
     (index: number) => {
-      cancelNavRaf()
-      setTrackTransform(index, 0, PANEL_TRACK_TRANSITION)
+      setTrackTransform(index, 0, HORIZONTAL_PANEL_TRACK_TRANSITION)
     },
-    [cancelNavRaf, setTrackTransform],
+    [setTrackTransform],
   )
 
   const goToPanel = useCallback(
     (index: number) => {
       const i = Math.max(0, Math.min(panelCount - 1, index))
+      draggingRef.current = false
       onActiveIndexChange(i)
       settleTrack(i)
     },
     [onActiveIndexChange, panelCount, settleTrack],
   )
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    activeIndexRef.current = activeIndex
+    if (draggingRef.current) return
     settleTrack(activeIndex)
   }, [activeIndex, settleTrack])
+
+  useEffect(() => {
+    const el = trackRef.current
+    if (!el) return
+    const onEnd = (e: TransitionEvent) => {
+      if (e.propertyName === 'transform') el.style.willChange = ''
+    }
+    el.addEventListener('transitionend', onEnd)
+    return () => el.removeEventListener('transitionend', onEnd)
+  }, [trackRef])
+
+  useEffect(() => {
+    const onResize = () => {
+      if (!draggingRef.current) settleTrack(activeIndexRef.current)
+    }
+    window.addEventListener('resize', onResize, { passive: true })
+    return () => window.removeEventListener('resize', onResize)
+  }, [settleTrack])
 
   useEffect(() => {
     const dragOffsetFor = (start: NonNullable<typeof navSwipeStartRef.current>, dx: number) => {
@@ -103,6 +114,7 @@ export function useHorizontalPanelSwipe({
     const finishSwipe = (clientX: number, clientY: number) => {
       const start = navSwipeStartRef.current
       navSwipeStartRef.current = null
+      draggingRef.current = false
       unlockHorizontalSwipeScroll()
       if (!start) {
         settleTrack(activeIndexRef.current)
@@ -112,7 +124,7 @@ export function useHorizontalPanelSwipe({
         ignoreClickRef.current = true
         window.setTimeout(() => {
           ignoreClickRef.current = false
-        }, 400)
+        }, 250)
       }
 
       const dx = clientX - start.x
@@ -145,7 +157,7 @@ export function useHorizontalPanelSwipe({
         navSwipeStartRef.current = null
         return
       }
-      const width = containerRef.current?.clientWidth || window.innerWidth || 1
+      const width = viewportWidth()
       navSwipeStartRef.current = {
         x: e.clientX,
         y: e.clientY,
@@ -171,11 +183,12 @@ export function useHorizontalPanelSwipe({
           return
         }
         start.dragging = true
+        draggingRef.current = true
         lockHorizontalSwipeScroll()
         setTrackTransform(start.panelIndex, 0, 'none')
       }
       if (e.cancelable) e.preventDefault()
-      scheduleDragFrame(start.panelIndex, dragOffsetFor(start, dx))
+      setTrackTransform(start.panelIndex, dragOffsetFor(start, dx), 'none')
     }
 
     const onPointerUpCapture = (e: PointerEvent) => {
@@ -186,6 +199,7 @@ export function useHorizontalPanelSwipe({
     const onPointerCancelCapture = () => {
       const index = navSwipeStartRef.current?.panelIndex ?? activeIndexRef.current
       navSwipeStartRef.current = null
+      draggingRef.current = false
       unlockHorizontalSwipeScroll()
       settleTrack(index)
     }
@@ -195,32 +209,19 @@ export function useHorizontalPanelSwipe({
     window.addEventListener('pointerup', onPointerUpCapture, true)
     window.addEventListener('pointercancel', onPointerCancelCapture, true)
     return () => {
-      cancelNavRaf()
       unlockHorizontalSwipeScroll()
       window.removeEventListener('pointerdown', onPointerDownCapture, true)
       window.removeEventListener('pointermove', onPointerMoveCapture, true)
       window.removeEventListener('pointerup', onPointerUpCapture, true)
       window.removeEventListener('pointercancel', onPointerCancelCapture, true)
     }
-  }, [
-    cancelNavRaf,
-    containerRef,
-    excludeSelector,
-    goToPanel,
-    panelCount,
-    scheduleDragFrame,
-    setTrackTransform,
-    settleTrack,
-  ])
+  }, [containerRef, excludeSelector, goToPanel, panelCount, settleTrack, setTrackTransform, viewportWidth])
 
   const trackStyle = useMemo(
     () => ({
       width: `${panelCount * 100}%`,
-      transform: `translate3d(${-activeIndex * panelWidthPercent}%, 0, 0)`,
-      transition: PANEL_TRACK_TRANSITION,
-      willChange: 'transform' as const,
     }),
-    [activeIndex, panelCount, panelWidthPercent],
+    [panelCount],
   )
 
   const panelStyle = useMemo(

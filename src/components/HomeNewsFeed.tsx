@@ -24,9 +24,11 @@ const FEED_CARD =
 
 interface Props {
   items: LineupFeedItem[]
+  /** Вкладка «Новинки» на экране — иначе видео на паузе */
+  panelActive?: boolean
 }
 
-export default function HomeNewsFeed({ items }: Props) {
+export default function HomeNewsFeed({ items, panelActive = true }: Props) {
   const t = useT()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -198,7 +200,7 @@ export default function HomeNewsFeed({ items }: Props) {
             slideRefs.current[index] = el
           }}
           item={item}
-          isActive={activeIndex === index}
+          isActive={panelActive && activeIndex === index}
           slideHeightPx={slideHeightPx}
           slideBottomPadPx={slideBottomPadPx}
           onOpen={() => openDetail(item)}
@@ -341,7 +343,7 @@ const NewsFeedSlide = forwardRef<HTMLElement, SlideProps>(function NewsFeedSlide
           <video
             ref={videoRef}
             src={item.videoUrl}
-            className={`pointer-events-none relative z-0 h-full w-full object-cover transition-opacity duration-500 ease-out ${
+            className={`pointer-events-none relative z-0 h-full w-full object-cover transition-opacity duration-150 ease-out ${
               isActive ? 'opacity-100' : 'opacity-40'
             }`}
             muted
@@ -393,7 +395,7 @@ const NewsFeedSlide = forwardRef<HTMLElement, SlideProps>(function NewsFeedSlide
       <button
         type="button"
         onClick={onOpen}
-        className={`w-full p-4 text-left outline-none transition-[transform,opacity] duration-500 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-[#F0B429]/55 ${FEED_CARD} ${
+        className={`w-full p-4 text-left outline-none transition-[transform,opacity] duration-150 ease-out [-webkit-tap-highlight-color:transparent] active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-[#F0B429]/55 ${FEED_CARD} ${
           isActive ? 'translate-y-0 opacity-100' : 'opacity-75'
         }`}
         aria-label={t('home.newsTab.openLineup', { title: item.title })}

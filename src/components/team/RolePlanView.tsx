@@ -165,7 +165,11 @@ export default function RolePlanView({
         ref={swipeContainerRef}
         className={`flex min-h-0 flex-1 flex-col overflow-hidden touch-pan-y ${bottomPad}`}
       >
-        <div ref={planTrackRef} className="flex h-full min-h-0 shrink-0" style={trackStyle}>
+        <div
+          ref={planTrackRef}
+          className="flex h-full min-h-0 shrink-0 [backface-visibility:hidden] [transform:translateZ(0)]"
+          style={trackStyle}
+        >
           <section
             className="flex min-h-0 shrink-0 flex-col"
             style={panelStyle}

@@ -29,6 +29,10 @@ import type { SideKey } from '@/lib/side'
 import { isSideMatch } from '@/lib/side'
 import { lockHorizontalSwipeScroll, unlockHorizontalSwipeScroll } from '@/lib/horizontal-swipe-scroll-lock'
 import {
+  HORIZONTAL_PANEL_TRACK_TRANSITION,
+  setHorizontalPanelTrackTransform,
+} from '@/lib/horizontal-panel-track'
+import {
   pickLocalizedLabel,
   positionMatchesSearch,
 } from '@/lib/i18n-helpers'
@@ -42,10 +46,9 @@ import { closeActiveMeetLocally, getActiveMeetResumePath, loadActiveMeet } from 
 import type { Meet } from '@/types/meet'
 
 const TAB_COUNT = 4
-const NAV_SWIPE_START_PX = 8
-const NAV_SWIPE_COMMIT_PX = 36
-const NAV_SWIPE_COMMIT_RATIO = 0.22
-const NAV_TRACK_TRANSITION = 'transform 320ms cubic-bezier(0.22, 0.72, 0.18, 1)'
+const NAV_SWIPE_START_PX = 6
+const NAV_SWIPE_COMMIT_PX = 28
+const NAV_SWIPE_COMMIT_RATIO = 0.18
 /** Иконки нижней навигации — `public/nav/*.png` */
 const NAV_ICON_SRC = [
   APP_SEARCH_ICON_SRC,
@@ -90,8 +93,7 @@ export default function HomeContent({
   const [activeIndex, setActiveIndex] = useState(1)
   const activeIndexRef = useRef(activeIndex)
   const panelWidthPercent = 100 / TAB_COUNT
-  const navRafRef = useRef<number | null>(null)
-  const navPendingOffsetRef = useRef(0)
+  const homeNavDraggingRef = useRef(false)
   const navSwipeStartRef = useRef<{
     x: number
     y: number
@@ -103,48 +105,57 @@ export default function HomeContent({
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
 
-  const setHomeTrackTransform = useCallback(
-    (index: number, offsetPx: number, transition?: string) => {
-      const el = homeTrackRef.current
-      if (!el) return
-      if (transition !== undefined) el.style.transition = transition
-      el.style.transform = `translate3d(calc(${-index * panelWidthPercent}% + ${offsetPx}px), 0, 0)`
-    },
-    [panelWidthPercent],
+  const viewportWidth = useCallback(
+    () => trackRef.current?.clientWidth || window.innerWidth || 1,
+    [],
   )
 
-  const cancelNavRaf = useCallback(() => {
-    if (navRafRef.current === null) return
-    window.cancelAnimationFrame(navRafRef.current)
-    navRafRef.current = null
-  }, [])
-
-  const scheduleHomeDragFrame = useCallback(
-    (index: number, offsetPx: number) => {
-      navPendingOffsetRef.current = offsetPx
-      if (navRafRef.current !== null) return
-      navRafRef.current = window.requestAnimationFrame(() => {
-        navRafRef.current = null
-        setHomeTrackTransform(index, navPendingOffsetRef.current, 'none')
-      })
+  const setHomeTrackTransform = useCallback(
+    (index: number, offsetPx: number, transition?: string) => {
+      setHorizontalPanelTrackTransform(
+        homeTrackRef.current,
+        index,
+        viewportWidth(),
+        offsetPx,
+        transition,
+      )
     },
-    [setHomeTrackTransform],
+    [viewportWidth],
   )
 
   const settleHomeTrack = useCallback(
     (index: number) => {
-      cancelNavRaf()
-      setHomeTrackTransform(index, 0, NAV_TRACK_TRANSITION)
+      setHomeTrackTransform(index, 0, HORIZONTAL_PANEL_TRACK_TRANSITION)
     },
-    [cancelNavRaf, setHomeTrackTransform],
+    [setHomeTrackTransform],
   )
 
   useLayoutEffect(() => {
     activeIndexRef.current = activeIndex
-  }, [activeIndex])
+    if (homeNavDraggingRef.current) return
+    settleHomeTrack(activeIndex)
+  }, [activeIndex, settleHomeTrack])
 
   useEffect(() => {
-    const id = window.setTimeout(() => setDebouncedQuery(query.trim()), 140)
+    const el = homeTrackRef.current
+    if (!el) return
+    const onEnd = (e: TransitionEvent) => {
+      if (e.propertyName === 'transform') el.style.willChange = ''
+    }
+    el.addEventListener('transitionend', onEnd)
+    return () => el.removeEventListener('transitionend', onEnd)
+  }, [])
+
+  useEffect(() => {
+    const onResize = () => {
+      if (!homeNavDraggingRef.current) settleHomeTrack(activeIndexRef.current)
+    }
+    window.addEventListener('resize', onResize, { passive: true })
+    return () => window.removeEventListener('resize', onResize)
+  }, [settleHomeTrack])
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebouncedQuery(query.trim()), 80)
     return () => window.clearTimeout(id)
   }, [query])
 
@@ -222,13 +233,18 @@ export default function HomeContent({
     setActiveMeet(null)
   }, [])
 
-  const scrollToPanel = useCallback((index: number) => {
-    const i = Math.max(0, Math.min(TAB_COUNT - 1, index))
-    setActiveIndex(i)
-    if (i === 0) {
-      searchInputRef.current?.focus()
-    }
-  }, [])
+  const scrollToPanel = useCallback(
+    (index: number) => {
+      const i = Math.max(0, Math.min(TAB_COUNT - 1, index))
+      homeNavDraggingRef.current = false
+      settleHomeTrack(i)
+      setActiveIndex(i)
+      if (i === 0) {
+        searchInputRef.current?.focus()
+      }
+    },
+    [settleHomeTrack],
+  )
 
   useEffect(() => {
     const commitDistanceFor = (width: number) =>
@@ -245,6 +261,7 @@ export default function HomeContent({
     const finishNavSwipe = (clientX: number, clientY: number) => {
       const start = navSwipeStartRef.current
       navSwipeStartRef.current = null
+      homeNavDraggingRef.current = false
       unlockHorizontalSwipeScroll()
       if (!start) {
         settleHomeTrack(activeIndexRef.current)
@@ -254,7 +271,7 @@ export default function HomeContent({
         ignoreHomeClickRef.current = true
         window.setTimeout(() => {
           ignoreHomeClickRef.current = false
-        }, 400)
+        }, 250)
       }
 
       const dx = clientX - start.x
@@ -284,7 +301,7 @@ export default function HomeContent({
         navSwipeStartRef.current = null
         return
       }
-      const width = trackRef.current?.clientWidth || window.innerWidth || 1
+      const width = viewportWidth()
       navSwipeStartRef.current = {
         x: e.clientX,
         y: e.clientY,
@@ -310,11 +327,12 @@ export default function HomeContent({
           return
         }
         start.dragging = true
+        homeNavDraggingRef.current = true
         lockHorizontalSwipeScroll()
         setHomeTrackTransform(start.activeIndex, 0, 'none')
       }
       if (e.cancelable) e.preventDefault()
-      scheduleHomeDragFrame(start.activeIndex, dragOffsetFor(start, dx))
+      setHomeTrackTransform(start.activeIndex, dragOffsetFor(start, dx), 'none')
     }
 
     const onPointerUpCapture = (e: PointerEvent) => {
@@ -325,6 +343,7 @@ export default function HomeContent({
     const onPointerCancelCapture = () => {
       const index = navSwipeStartRef.current?.activeIndex ?? activeIndexRef.current
       navSwipeStartRef.current = null
+      homeNavDraggingRef.current = false
       unlockHorizontalSwipeScroll()
       settleHomeTrack(index)
     }
@@ -334,14 +353,13 @@ export default function HomeContent({
     window.addEventListener('pointerup', onPointerUpCapture, true)
     window.addEventListener('pointercancel', onPointerCancelCapture, true)
     return () => {
-      cancelNavRaf()
       unlockHorizontalSwipeScroll()
       window.removeEventListener('pointerdown', onPointerDownCapture, true)
       window.removeEventListener('pointermove', onPointerMoveCapture, true)
       window.removeEventListener('pointerup', onPointerUpCapture, true)
       window.removeEventListener('pointercancel', onPointerCancelCapture, true)
     }
-  }, [cancelNavRaf, scheduleHomeDragFrame, setHomeTrackTransform, settleHomeTrack])
+  }, [setHomeTrackTransform, settleHomeTrack, viewportWidth])
 
   const navLabels = useMemo(
     () => [
@@ -387,11 +405,8 @@ export default function HomeContent({
   const homeTrackStyle = useMemo(
     () => ({
       width: `${TAB_COUNT * 100}%`,
-      transform: `translate3d(${-activeIndex * panelWidthPercent}%, 0, 0)`,
-      transition: NAV_TRACK_TRANSITION,
-      willChange: 'transform',
     }),
-    [activeIndex, panelWidthPercent],
+    [],
   )
   const homePanelStyle = useMemo(
     () => ({ width: `${panelWidthPercent}%` }),
@@ -410,8 +425,16 @@ export default function HomeContent({
           e.stopPropagation()
         }}
       >
-        <div ref={homeTrackRef} className="flex h-full min-h-0 shrink-0" style={homeTrackStyle}>
-        <section className="flex h-full min-h-0 shrink-0 grow-0 flex-col" style={homePanelStyle} aria-hidden={activeIndex !== 0}>
+        <div
+          ref={homeTrackRef}
+          className="flex h-full min-h-0 shrink-0 [backface-visibility:hidden] [transform:translateZ(0)]"
+          style={homeTrackStyle}
+        >
+        <section
+          className={`flex h-full min-h-0 shrink-0 grow-0 flex-col ${activeIndex !== 0 ? 'pointer-events-none [content-visibility:hidden]' : ''}`}
+          style={homePanelStyle}
+          aria-hidden={activeIndex !== 0}
+        >
             <div className="no-scrollbar min-h-0 w-full max-w-full flex-1 overflow-y-auto overscroll-y-contain px-app-screen pt-3 pb-[calc(8.1rem+env(safe-area-inset-bottom,0px))] [-webkit-overflow-scrolling:touch]">
             <div className="relative">
               <input
@@ -481,7 +504,11 @@ export default function HomeContent({
           </div>
         </section>
 
-        <section className="flex h-full min-h-0 shrink-0 grow-0 flex-col" style={homePanelStyle} aria-hidden={activeIndex !== 1}>
+        <section
+          className={`flex h-full min-h-0 shrink-0 grow-0 flex-col ${activeIndex !== 1 ? 'pointer-events-none [content-visibility:hidden]' : ''}`}
+          style={homePanelStyle}
+          aria-hidden={activeIndex !== 1}
+        >
             <div className="no-scrollbar min-h-0 w-full max-w-full flex-1 overflow-y-auto overscroll-y-contain px-app-screen pt-3 pb-[calc(8.1rem+env(safe-area-inset-bottom,0px))] [-webkit-overflow-scrolling:touch]">
             <div className="grid grid-cols-2 gap-3">
               {mapsWithCounts.map(({ map, grenadeCount }, idx) => (
@@ -524,7 +551,11 @@ export default function HomeContent({
           </div>
         </section>
 
-        <section className="flex h-full min-h-0 shrink-0 grow-0 flex-col" style={homePanelStyle} aria-hidden={activeIndex !== 2}>
+        <section
+          className={`flex h-full min-h-0 shrink-0 grow-0 flex-col ${activeIndex !== 2 ? 'pointer-events-none [content-visibility:hidden]' : ''}`}
+          style={homePanelStyle}
+          aria-hidden={activeIndex !== 2}
+        >
           {activeMeet ? (
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-app-screen pb-[calc(8.1rem+env(safe-area-inset-bottom,0px))] pt-6">
               <h2 className="mb-1 text-center text-lg font-bold">{t('home.tacticsTab.title')}</h2>
@@ -575,11 +606,11 @@ export default function HomeContent({
         </section>
 
         <section
-          className="flex h-full min-h-0 min-w-0 shrink-0 grow-0 flex-col overflow-hidden"
+          className={`flex h-full min-h-0 min-w-0 shrink-0 grow-0 flex-col overflow-hidden ${activeIndex !== 3 ? 'pointer-events-none [content-visibility:hidden]' : ''}`}
           style={homePanelStyle}
           aria-hidden={activeIndex !== 3}
         >
-          <HomeNewsFeed items={lineupFeedItems} />
+          <HomeNewsFeed items={lineupFeedItems} panelActive={activeIndex === 3} />
         </section>
         </div>
       </div>
@@ -608,12 +639,12 @@ export default function HomeContent({
                 aria-label={label}
                 title={label}
                 onClick={() => scrollToPanel(i)}
-                className={`flex shrink-0 touch-manipulation items-center justify-center rounded-[0.6rem] px-0.5 py-0.5 outline-none transition-colors duration-300 ease-[cubic-bezier(0.25,0.85,0.35,1)] [-webkit-tap-highlight-color:transparent] focus-visible:ring-2 focus-visible:ring-[#F0B429]/55 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d0d0d] ${
+                className={`flex shrink-0 touch-manipulation items-center justify-center rounded-[0.6rem] px-0.5 py-0.5 outline-none transition-colors duration-150 ease-out [-webkit-tap-highlight-color:transparent] focus-visible:ring-2 focus-visible:ring-[#F0B429]/55 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d0d0d] ${
                   active ? 'text-[#F0B429]' : 'text-white/85 active:text-white'
                 }`}
               >
                 <span
-                  className={`box-border flex min-h-12 items-center rounded-[1.05rem] transition-[border-color,padding,gap] duration-300 ease-out ${
+                  className={`box-border flex min-h-12 items-center rounded-[1.05rem] transition-[border-color,padding,gap] duration-150 ease-out ${
                     active
                       ? 'w-auto max-w-none gap-1.5 border-2 border-[#F0B429] px-1.5 py-0.5'
                       : 'size-12 shrink-0 justify-center border-2 border-transparent'
@@ -628,7 +659,7 @@ export default function HomeContent({
                       loading="eager"
                       decoding="async"
                       draggable={false}
-                      className={`block h-[calc(32px*1.2)] w-[calc(32px*1.2)] object-contain object-center select-none transition-opacity duration-300 ease-out ${
+                      className={`block h-[calc(32px*1.2)] w-[calc(32px*1.2)] object-contain object-center select-none transition-opacity duration-150 ease-out ${
                         active ? 'opacity-100' : 'opacity-[0.9]'
                       }`}
                     />
