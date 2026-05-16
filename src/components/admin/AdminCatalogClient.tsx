@@ -143,7 +143,7 @@ export default function AdminCatalogClient({ mapId, map }: Props) {
         headers: adminHeaders(),
         cache: 'no-store',
       })
-      const j = r.ok ? await r.json() : { positions: [] }
+      const j = (r.ok ? await r.json() : { positions: [] }) as { positions?: MapPosition[] }
       setExtensions(Array.isArray(j.positions) ? j.positions : [])
     } finally {
       setLoading(false)

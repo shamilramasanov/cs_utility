@@ -12,9 +12,12 @@
     "start": "next start",
     "lint": "eslint",
     "build:favicon": "node scripts/build-favicon.mjs",
-    "seed:editor-db": "node --env-file=.env scripts/seed-editor-content.mjs",
-    "db:schema": "node --env-file=.env scripts/apply-editor-schema.mjs",
-    "hyperdrive:create": "node scripts/create-hyperdrive.mjs"
+    "db:schema": "wrangler d1 execute csutility-editor --remote --file=scripts/sql/d1/001_editor_content.sql",
+    "db:schema:local": "wrangler d1 execute csutility-editor --local --file=scripts/sql/d1/001_editor_content.sql",
+    "db:seed": "node scripts/d1-seed.mjs",
+    "db:seed:local": "node scripts/d1-seed.mjs --local",
+    "db:migrate-from-pg": "node --env-file=.env scripts/migrate-pg-to-d1.mjs",
+    "seed:editor-db": "npm run db:seed"
   },
   "dependencies": {
     "@swc/helpers": "0.5.15",
@@ -25,16 +28,17 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260516.1",
+    "@opennextjs/cloudflare": "^1.19.10",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "@opennextjs/cloudflare": "^1.19.10",
     "eslint-config-next": "16.2.6",
-    "wrangler": "^4.92.0",
     "png-to-ico": "^3.0.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.92.0"
   }
 }

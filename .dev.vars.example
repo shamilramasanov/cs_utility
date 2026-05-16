@@ -1,7 +1,5 @@
-# Локальный preview: cp .dev.vars.example .dev.vars и подставь значения (файл в .gitignore)
+# Локальный preview: cp .dev.vars.example .dev.vars
 NEXTJS_ENV=development
-DATABASE_PUBLIC_URL=postgresql://...
 ADMIN_SECRET=
 
-# Production (Cloudflare Workers): после `npm run hyperdrive:create` добавьте в wrangler.jsonc
-# binding HYPERDRIVE с id. DATABASE_PUBLIC_URL в Dashboard можно оставить для fallback.
+# D1 настраивается в wrangler.jsonc (binding DB). Postgres/Railway больше не нужен на Workers.

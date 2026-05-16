@@ -1,7 +1,7 @@
-/** Расширение env OpenNext на Workers (Hyperdrive binding из wrangler.jsonc). */
+/** Расширение env OpenNext на Workers. */
 declare global {
   interface CloudflareEnv {
-    HYPERDRIVE?: Hyperdrive
+    DB?: D1Database
   }
 }
 

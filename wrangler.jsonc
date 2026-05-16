@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "main": ".open-next/worker.js",
   "name": "csutility",
-  // Не затирать ADMIN_SECRET, DATABASE_PUBLIC_URL и др. из Dashboard при каждом деплое
+  // Не затирать ADMIN_SECRET и др. из Dashboard при каждом деплое
   "keep_vars": true,
   "compatibility_date": "2026-05-16",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
@@ -22,11 +22,11 @@
   "images": {
     "binding": "IMAGES"
   },
-  // Hyperdrive: npm run hyperdrive:create → вставьте id ниже (ускоряет Postgres с Workers)
-  // "hyperdrive": [
-  //   {
-  //     "binding": "HYPERDRIVE",
-  //     "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-  //   }
-  // ]
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "csutility-editor",
+      "database_id": "37b6e1b4-c273-40a0-a3ed-bffe9095aa0a"
+    }
+  ]
 }

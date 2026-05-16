@@ -80,7 +80,7 @@ export default function MapPageClientNoSSR({
       return (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-app-screen py-12 text-center">
           <p className="text-sm text-[#888]">
-            Не удалось загрузить карту. Проверьте DATABASE_PUBLIC_URL в Cloudflare и обновите страницу.
+            Не удалось загрузить карту. Обновите страницу или проверьте D1 в Cloudflare.
           </p>
         </div>
       )

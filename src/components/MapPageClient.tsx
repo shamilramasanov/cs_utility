@@ -375,9 +375,10 @@ function MapPageClientInner({
     const ctrl = new AbortController()
     fetch(`/api/position-zones?map=${mapId}&side=${apiSide}`, { signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : null))
-      .then((json) => {
+      .then((raw) => {
         if (seq !== zonesFetchSeqRef.current) return
-        if (json && Array.isArray(json.zones) && json.zones.length > 0) {
+        const json = raw as { zones?: PositionZone[] } | null
+        if (json?.zones && json.zones.length > 0) {
           setZones(json.zones)
         }
       })
