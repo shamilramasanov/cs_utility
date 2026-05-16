@@ -233,8 +233,9 @@ const NewsFeedSlide = forwardRef<HTMLElement, SlideProps>(function NewsFeedSlide
   const color = GRENADE_COLORS[item.type]
   const typeLabel = GRENADE_LABELS[item.type]
   const emoji = GRENADE_EMOJIS[item.type]
-  /** «Подпись в шите» из админки — откуда бросаем; positionLabel — точка на карте каталога */
-  const throwFromLabel = item.variantLabel?.trim() || null
+  const positionTag = item.positionLabel?.trim()
+    ? t('home.newsTab.positionFrom', { position: item.positionLabel })
+    : item.variantLabel?.trim() || null
 
   const clearLongPressTimer = useCallback(() => {
     if (longPressTimerRef.current !== null) {
@@ -355,21 +356,15 @@ const NewsFeedSlide = forwardRef<HTMLElement, SlideProps>(function NewsFeedSlide
         </div>
 
         <div
-          className="pointer-events-none absolute inset-x-0 top-0 z-[5] bg-gradient-to-b from-black/85 via-black/55 to-transparent px-3 pb-10 pt-3 [transform:translate3d(0,0,1px)] [-webkit-transform:translate3d(0,0,1px)]"
+          className="pointer-events-none absolute inset-x-0 top-0 z-[5] bg-gradient-to-b from-black/80 via-black/45 to-transparent px-3 pb-8 pt-3"
           aria-hidden
         >
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-black/45 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white [transform:translate3d(0,0,2px)] [-webkit-transform:translate3d(0,0,2px)]">
+          <div className="flex max-w-[calc(100%-3rem)] flex-wrap items-center gap-x-1.5 gap-y-1 rounded-xl border border-white/10 bg-black/55 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-lg backdrop-blur-sm">
             <span className="rounded-full px-2 py-0.5" style={{ backgroundColor: `${color}44`, color }}>
               {emoji} {typeLabel}
             </span>
             <span className="text-white/95">{item.mapName}</span>
-            {throwFromLabel ? (
-              <span className="text-white/80">· {throwFromLabel}</span>
-            ) : item.positionLabel ? (
-              <span className="text-white/80">
-                · {t('home.newsTab.positionFrom', { position: item.positionLabel })}
-              </span>
-            ) : null}
+            {positionTag ? <span className="text-white/85">· {positionTag}</span> : null}
           </div>
         </div>
 
@@ -401,8 +396,9 @@ const NewsFeedSlide = forwardRef<HTMLElement, SlideProps>(function NewsFeedSlide
         aria-label={t('home.newsTab.openLineup', { title: item.title })}
       >
         <h3 className="text-lg font-bold leading-snug text-white">{item.title}</h3>
-        <p className="throw-method-attention mt-3 w-full rounded-xl border-2 border-[#3ecf6e]/45 bg-[#102015] px-3 py-3 text-center text-[15px] font-bold leading-snug text-white sm:text-base">
-          {t('home.newsTab.throwMethodWithLabel', { method: item.throwMethodLabel })}
+        <p className="throw-method-attention mt-3 rounded-xl border border-[#3ecf6e]/50 bg-[#102015] px-3 py-3 text-[15px] font-bold leading-snug sm:text-base">
+          <span className="text-[#86efac]">{t('home.newsTab.throwMethod')}:</span>{' '}
+          <span className="text-white">{item.throwMethodLabel}</span>
         </p>
         {item.methodHint ? (
           <p className="mt-2 text-base font-semibold leading-snug text-white">{item.methodHint}</p>

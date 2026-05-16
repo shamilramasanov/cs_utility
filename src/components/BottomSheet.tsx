@@ -62,6 +62,7 @@ export default function BottomSheet({
   const isDragging = useRef(false)
   const [showThrowGuide, setShowThrowGuide] = useState(false)
   const [portalReady, setPortalReady] = useState(false)
+  const [videoPaused, setVideoPaused] = useState(false)
   const variantRafRef = useRef<number | null>(null)
   const variantPendingOffsetRef = useRef(0)
   const variantSwipeStartRef = useRef<{
@@ -113,6 +114,7 @@ export default function BottomSheet({
   useEffect(() => {
     const v = videoRef.current
     if (!v || !mediaUrl) return
+    setVideoPaused(false)
     // При переключении позиции/варианта всегда начинаем ролик с начала,
     // даже если у разных вариантов совпадает один и тот же media_url.
     try {
@@ -122,6 +124,18 @@ export default function BottomSheet({
     }
     v.play().catch(() => {})
   }, [grenade.id, vi, mediaUrl])
+
+  const onVideoTap = useCallback(() => {
+    const v = videoRef.current
+    if (!v) return
+    if (v.paused) {
+      void v.play().catch(() => {})
+      setVideoPaused(false)
+    } else {
+      v.pause()
+      setVideoPaused(true)
+    }
+  }, [])
 
   useEffect(() => {
     // При выборе другой гранаты/варианта всегда начинаем чтение контента сверху.
@@ -342,20 +356,56 @@ export default function BottomSheet({
             }
           >
             {!compact ? <p className="text-[10px] uppercase tracking-wider text-[#666] px-4 pt-2 pb-1">Видео</p> : null}
-            <video
-              ref={variantIndex === vi ? videoRef : undefined}
-              key={`${variantIndex}-${itemMediaUrl}`}
-              src={itemMediaUrl}
-              className={
-                compact
-                  ? 'h-full w-full min-h-0 flex-1 object-cover object-center bg-black md:object-contain'
-                  : 'h-[min(68vh,500px)] w-full object-cover bg-black md:object-contain'
+            <div
+              role="button"
+              tabIndex={variantIndex === vi ? 0 : -1}
+              aria-pressed={variantIndex === vi ? videoPaused : undefined}
+              aria-label={
+                variantIndex === vi
+                  ? videoPaused
+                    ? t('home.newsTab.playVideo')
+                    : t('home.newsTab.pauseVideo')
+                  : undefined
               }
-              playsInline
-              loop
-              muted
-              controls
-            />
+              className={`relative isolate touch-manipulation select-none outline-none [-webkit-tap-highlight-color:transparent] focus-visible:ring-2 focus-visible:ring-[#F0B429]/55 ${
+                compact ? 'flex min-h-0 flex-1 flex-col' : ''
+              }`}
+              onClick={variantIndex === vi ? onVideoTap : undefined}
+              onKeyDown={
+                variantIndex === vi
+                  ? (e) => {
+                      if (e.key === ' ' || e.key === 'Enter') {
+                        e.preventDefault()
+                        onVideoTap()
+                      }
+                    }
+                  : undefined
+              }
+            >
+              <video
+                ref={variantIndex === vi ? videoRef : undefined}
+                key={`${variantIndex}-${itemMediaUrl}`}
+                src={itemMediaUrl}
+                className={`pointer-events-none ${
+                  compact
+                    ? 'h-full w-full min-h-0 flex-1 object-cover object-center bg-black md:object-contain'
+                    : 'h-[min(68vh,500px)] w-full object-cover bg-black md:object-contain'
+                }`}
+                playsInline
+                loop
+                muted
+                disablePictureInPicture
+                preload="metadata"
+              />
+              {videoPaused && variantIndex === vi ? (
+                <span
+                  className="pointer-events-none absolute right-3 top-3 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/60 pl-0.5 text-xl text-white shadow-lg backdrop-blur-sm"
+                  aria-hidden
+                >
+                  ▶
+                </span>
+              ) : null}
+            </div>
           </section>
         )}
         {itemGallery.map((url, i) => (
