@@ -7,6 +7,8 @@ export type MapPageInitialQuery = {
   side: string | null
   pnade: string | null
   tab: string | null
+  lineup: string | null
+  variant: string | null
 }
 
 export function firstSearchParam(
@@ -27,6 +29,8 @@ export function mapPageQueryFromRecord(
     side: firstSearchParam(sp.side),
     pnade: firstSearchParam(sp.pnade),
     tab: firstSearchParam(sp.tab),
+    lineup: firstSearchParam(sp.lineup),
+    variant: firstSearchParam(sp.variant),
   }
 }
 
@@ -38,5 +42,7 @@ export function toURLSearchParamsFromMapQuery(s: MapPageInitialQuery): URLSearch
   if (s.side) u.set('side', s.side)
   if (s.pnade) u.set('pnade', s.pnade)
   if (s.tab) u.set('tab', s.tab)
+  if (s.lineup) u.set('lineup', s.lineup)
+  if (s.variant) u.set('variant', s.variant)
   return u
 }

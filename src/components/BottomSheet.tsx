@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Grenade } from '@/types'
 import { GRENADE_COLORS, GRENADE_LABELS, GRENADE_EMOJIS, DIFFICULTY_COLORS, DIFFICULTY_LABELS } from '@/lib/grenades'
+import { getThrowMethodLabel } from '@/lib/throw-labels'
 import { useT } from '@/i18n'
 import ThrowVariantOriginDock from './ThrowVariantOriginDock'
 import { teardownThrowVariantSwipeWindow } from '@/lib/throw-variant-swipe-window'
@@ -19,23 +20,6 @@ interface Props {
   /** Кнопка «Назад к плану» (раздел тактики). */
   backToPlanLabel?: string
   onBackToPlan?: () => void
-}
-
-const THROW_LABELS: Record<string, string> = {
-  normal: 'Левая кнопка мышки',
-  jump: 'Левая кнопка+пробел',
-  jumprun: 'w+левая кнопка+пробел',
-  run: 'Правая кнопка мышки',
-  right: 'Правая кнопка мышки',
-  rightclick: 'Правая кнопка мышки',
-  mouse2: 'Правая кнопка мышки',
-  left_right: 'Левая+правая кнопка',
-  leftright: 'Левая+правая кнопка',
-  lr: 'Левая+правая кнопка',
-  d_jumprun: 'd+левая кнопка+пробел',
-  djumprun: 'd+левая кнопка+пробел',
-  d_jump: 'd+левая кнопка+пробел',
-  d_jumpthrow: 'd+левая кнопка+пробел',
 }
 
 const THROW_GUIDE_HINTS: Record<string, string> = {
@@ -108,7 +92,7 @@ export default function BottomSheet({
       : ''
   const rootDescription =
     grenade.description && grenade.description !== 'unused' ? grenade.description : ''
-  const throwLabel = THROW_LABELS[throwType] ?? throwType
+  const throwLabel = getThrowMethodLabel(throwType)
   const throwGuideHint =
     activeVar?.method_hint?.trim() ||
     THROW_GUIDE_HINTS[throwType] ||

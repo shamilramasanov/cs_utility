@@ -2,6 +2,7 @@ import HomeContentClient from '@/components/HomeContentClient'
 import { getMaps } from '@/lib/grenades'
 import { getMergedGrenadesForMap, getMergedGrenadesForMapFirstLayer } from '@/lib/lineups'
 import { getMergedPositionCatalog } from '@/lib/position-catalog-runtime'
+import { buildLineupFeedItems } from '@/lib/lineup-feed'
 import type { Grenade } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -18,12 +19,14 @@ export default async function HomePage() {
     await Promise.all(maps.map(async (m) => [m.id, await getMergedGrenadesForMap(m.id)] as const)),
   )
   const positionCatalog = await getMergedPositionCatalog()
+  const lineupFeedItems = await buildLineupFeedItems(positionCatalog)
 
   return (
     <HomeContentClient
       mapsWithCounts={mapsWithCounts}
       grenadesByMap={grenadesByMap}
       positionCatalog={positionCatalog}
+      lineupFeedItems={lineupFeedItems}
     />
   )
 }

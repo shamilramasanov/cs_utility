@@ -67,6 +67,14 @@ export function clearActiveMeetCode() {
   localStorage.removeItem(ACTIVE_MEET_CODE_KEY)
 }
 
+/** Снимает активную встречу с устройства (код и данные в localStorage). */
+export function closeActiveMeetLocally(): void {
+  if (typeof window === 'undefined') return
+  const code = getActiveMeetCode()
+  if (code) localStorage.removeItem(meetStorageKey(code))
+  clearActiveMeetCode()
+}
+
 export function getActiveMeetCode(): string | null {
   if (typeof window === 'undefined') return null
   return localStorage.getItem(ACTIVE_MEET_CODE_KEY)?.toUpperCase() ?? null

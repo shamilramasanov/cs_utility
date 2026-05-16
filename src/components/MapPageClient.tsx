@@ -44,6 +44,13 @@ import {
 import { buildThrowOriginItems } from '@/lib/throw-origin-items'
 import ThrowOriginPositionCards from './ThrowOriginPositionCards'
 import { MeetSessionProvider } from '@/context/MeetSessionContext'
+import {
+  HOME_RETURN_FEED_ITEM_STORAGE_KEY,
+  HOME_RETURN_PANEL_NEWS,
+  HOME_RETURN_PANEL_SEARCH,
+  HOME_RETURN_PANEL_STORAGE_KEY,
+  homeUrlWithReturnPanel,
+} from '@/lib/home-return-panel'
 
 const mapViewFallback = <div className="h-full w-full bg-[#121212]" aria-hidden />
 const panelFallback = <div className="h-full w-full bg-[#0d0d0d]" aria-hidden />
@@ -88,10 +95,6 @@ const ThrowOriginGallery = dynamic(() => import('./ThrowOriginGallery'), {
 const PositionSelector = dynamic(() => import('./PositionSelector'), {
   loading: () => positionSelectorFallback,
 })
-
-/** См. `HomeContent` / `PositionPhotoCard`: переход с карточки глобального поиска. */
-const HOME_SEARCH_RETURN_PANEL_KEY = 'cs2-home-return-panel'
-const HOME_SEARCH_RETURN_VALUE = 'search'
 
 const GRENADE_TYPES: Array<{ id: string; label: string; emoji: string }> = [
   { id: 'all', label: 'Все', emoji: '🎯' },
@@ -473,7 +476,7 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
 
   const onPositionReset = useCallback(() => {
     try {
-      if (sessionStorage.getItem(HOME_SEARCH_RETURN_PANEL_KEY) === HOME_SEARCH_RETURN_VALUE) {
+      if (sessionStorage.getItem(HOME_RETURN_PANEL_STORAGE_KEY) === HOME_RETURN_PANEL_SEARCH) {
         router.push('/')
         return
       }
@@ -496,12 +499,30 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
     [navigate],
   )
 
+  const closeSelectedLineupSheet = useCallback(() => {
+    try {
+      if (sessionStorage.getItem(HOME_RETURN_PANEL_STORAGE_KEY) === HOME_RETURN_PANEL_NEWS) {
+        let feedItemId: string | null = null
+        try {
+          feedItemId = sessionStorage.getItem(HOME_RETURN_FEED_ITEM_STORAGE_KEY)
+        } catch {
+          /* private mode */
+        }
+        router.replace(homeUrlWithReturnPanel(HOME_RETURN_PANEL_NEWS, feedItemId))
+        return
+      }
+    } catch {
+      /* private mode */
+    }
+    const g = selectedGrenade
+    setSelectedGrenade(null)
+    if (g) setMapPreviewGrenade(g)
+  }, [router, selectedGrenade])
+
   /** «Умная» кнопка ←: spot → pos → side → главная. */
   const onSmartBack = useCallback(() => {
     if (selectedGrenade) {
-      const g = selectedGrenade
-      setSelectedGrenade(null)
-      if (g) setMapPreviewGrenade(g)
+      closeSelectedLineupSheet()
       return
     }
     if (mapPreviewGrenade) {
@@ -526,7 +547,7 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
     }
     router.push('/')
   }, [
-    selectedGrenade,
+    closeSelectedLineupSheet,
     mapPreviewGrenade,
     spotIdFromUrl,
     posIdFromUrl,
@@ -574,6 +595,21 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
     if (!selectedPos) return bySide
     return filterGrenadesByPosition(bySide, selectedPos, positionCatalog)
   }, [bySide, selectedPos, positionCatalog])
+
+  /** Открытие раскидки из ленты «Новинки» (`?lineup=&variant=`). */
+  useEffect(() => {
+    const lineupId = searchParams.get('lineup')
+    if (!lineupId || !selectedPos) return
+    const g =
+      byPosition.find((x) => x.id === lineupId) ?? bySide.find((x) => x.id === lineupId)
+    if (!g) return
+    setMapPreviewGrenade(null)
+    setSelectedGrenade(g)
+    const raw = parseInt(searchParams.get('variant') ?? '0', 10)
+    const vi = Number.isFinite(raw) ? raw : 0
+    const max = Math.max(0, (g.throw_variants?.length ?? 1) - 1)
+    setActiveThrowVariantIndex(Math.min(Math.max(0, vi), max))
+  }, [searchParams, selectedPos, byPosition, bySide])
 
   const bySpot = useMemo(() => {
     if (!selectedSubspot) return byPosition
@@ -1144,11 +1180,7 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
           <div className="pointer-events-auto ml-auto mr-auto h-full min-h-0 w-full max-w-[980px] overflow-hidden rounded-t-2xl md:rounded-2xl border border-[#2b2b2b] bg-[#141414]/92 backdrop-blur-md shadow-2xl">
             <BottomSheet
               grenade={selectedGrenade}
-              onClose={() => {
-                const g = selectedGrenade
-                setSelectedGrenade(null)
-                if (g) setMapPreviewGrenade(g)
-              }}
+              onClose={closeSelectedLineupSheet}
               panel
               activeThrowVariantIndex={activeThrowVariantIndex}
               onThrowVariantIndexChange={setActiveThrowVariantIndex}

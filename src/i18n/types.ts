@@ -50,10 +50,34 @@ export interface Dictionary {
     tacticsTab: {
       title: string
       hint: string
+      resumeMeet: string
+      activeMeetBadge: string
+      activeMeetCode: string
+      activeMeetPlayers: string
+      activeMeetSteps: string
+      activeMeetNoTactic: string
+      closeMeet: string
+      closeMeetTitle: string
+      closeMeetWarning: string
+      closeMeetCancel: string
+      closeMeetConfirm: string
+      createNewMeet: string
     }
     newsTab: {
       title: string
       hint: string
+      empty: string
+      toPosition: string
+      positionFrom: string
+      noDescription: string
+      throwMethod: string
+      throwMethodWithLabel: string
+      noThrowHint: string
+      tapForDetails: string
+      openLineup: string
+      pauseVideo: string
+      playVideo: string
+      fastForwardBadge: string
     }
     teamCta: {
       title: string

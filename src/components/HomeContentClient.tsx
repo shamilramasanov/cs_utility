@@ -1,8 +1,10 @@
 'use client'
 
+import { Suspense } from 'react'
 import dynamic from 'next/dynamic'
 import type { Grenade, MapData } from '@/types'
 import type { MapPosition } from '@/types/positions'
+import type { LineupFeedItem } from '@/lib/lineup-feed-types'
 
 interface MapEntry {
   map: MapData
@@ -13,6 +15,7 @@ export interface HomeContentClientProps {
   mapsWithCounts: MapEntry[]
   grenadesByMap: Record<string, Grenade[]>
   positionCatalog: MapPosition[]
+  lineupFeedItems: LineupFeedItem[]
 }
 
 /**
@@ -40,5 +43,13 @@ const HomeContent = dynamic(() => import('./HomeContent'), {
 })
 
 export default function HomeContentClient(props: HomeContentClientProps) {
-  return <HomeContent {...props} />
+  return (
+    <Suspense
+      fallback={
+        <div className="relative flex min-h-[50vh] flex-1 flex-col bg-[#0d0d0d]" aria-hidden />
+      }
+    >
+      <HomeContent {...props} />
+    </Suspense>
+  )
 }

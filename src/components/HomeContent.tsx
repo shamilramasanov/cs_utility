@@ -1,7 +1,15 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import {
+  HOME_RETURN_FEED_ITEM_QUERY,
+  HOME_RETURN_FEED_ITEM_STORAGE_KEY,
+  HOME_RETURN_PANEL_NEWS,
+  HOME_RETURN_PANEL_QUERY,
+  HOME_RETURN_PANEL_SEARCH,
+  HOME_RETURN_PANEL_STORAGE_KEY,
+} from '@/lib/home-return-panel'
 import Image from 'next/image'
 import {
   useCallback,
@@ -27,7 +35,11 @@ import {
 import { usePositionOverrides } from '@/lib/usePositionOverrides'
 import { PositionPhotoCard } from '@/components/PositionPhotoGrid'
 import { APP_SEARCH_ICON_SRC, SearchInputLeadingIcon } from '@/components/SearchInputLeadingIcon'
-import { getActiveMeetResumePath } from '@/lib/meet'
+import HomeActiveMeetPreview from '@/components/HomeActiveMeetPreview'
+import HomeNewsFeed from '@/components/HomeNewsFeed'
+import type { LineupFeedItem } from '@/lib/lineup-feed-types'
+import { closeActiveMeetLocally, getActiveMeetResumePath, loadActiveMeet } from '@/lib/meet'
+import type { Meet } from '@/types/meet'
 
 const TAB_COUNT = 4
 const NAV_SWIPE_START_PX = 8
@@ -51,6 +63,7 @@ interface Props {
   mapsWithCounts: MapEntry[]
   grenadesByMap: Record<string, Grenade[]>
   positionCatalog: MapPosition[]
+  lineupFeedItems: LineupFeedItem[]
 }
 
 type SearchHit = {
@@ -60,9 +73,15 @@ type SearchHit = {
   mapName: string
 }
 
-export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCatalog }: Props) {
+export default function HomeContent({
+  mapsWithCounts,
+  grenadesByMap,
+  positionCatalog,
+  lineupFeedItems,
+}: Props) {
   const t = useT()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const lang = useLocale()
   const { screenshotFor } = usePositionOverrides()
   const trackRef = useRef<HTMLDivElement>(null)
@@ -130,74 +149,92 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
   }, [query])
 
   useLayoutEffect(() => {
+    const panelFromUrl = searchParams.get(HOME_RETURN_PANEL_QUERY)
+    if (panelFromUrl === HOME_RETURN_PANEL_NEWS) {
+      const feedItemId = searchParams.get(HOME_RETURN_FEED_ITEM_QUERY)
+      if (feedItemId) {
+        try {
+          sessionStorage.setItem(HOME_RETURN_FEED_ITEM_STORAGE_KEY, feedItemId)
+        } catch {
+          /* private mode / quota */
+        }
+      }
+      setActiveIndex(3)
+      settleHomeTrack(3)
+      try {
+        // Не удаляем ключ до очистки URL: после router.replace('/') эффект снова
+        // сработает без query — ветка sessionStorage ниже удержит вкладку «Новинки».
+        sessionStorage.setItem(HOME_RETURN_PANEL_STORAGE_KEY, HOME_RETURN_PANEL_NEWS)
+      } catch {
+        /* private mode / quota */
+      }
+      router.replace('/', { scroll: false })
+      return
+    }
+
     let restoreSearch = false
     let savedQuery = ''
     try {
-      if (sessionStorage.getItem('cs2-home-return-panel') === 'search') {
+      const returnPanel = sessionStorage.getItem(HOME_RETURN_PANEL_STORAGE_KEY)
+      if (returnPanel === HOME_RETURN_PANEL_SEARCH) {
         restoreSearch = true
         savedQuery = sessionStorage.getItem('cs2-home-search-query') ?? ''
-        sessionStorage.removeItem('cs2-home-return-panel')
+        sessionStorage.removeItem(HOME_RETURN_PANEL_STORAGE_KEY)
         sessionStorage.removeItem('cs2-home-search-query')
+      } else if (returnPanel === HOME_RETURN_PANEL_NEWS) {
+        sessionStorage.removeItem(HOME_RETURN_PANEL_STORAGE_KEY)
+        setActiveIndex(3)
+        settleHomeTrack(3)
+        return
       }
     } catch {
       /* private mode / quota */
     }
     const panel = restoreSearch ? 0 : 1
     setActiveIndex(panel)
+    settleHomeTrack(panel)
     if (restoreSearch) {
       setQuery(savedQuery)
       setDebouncedQuery(savedQuery.trim())
       requestAnimationFrame(() => searchInputRef.current?.focus())
     }
-  }, [])
+  }, [router, searchParams, settleHomeTrack])
 
   const resumePathRef = useRef<string | null>(null)
-  const [hasActiveMeet, setHasActiveMeet] = useState(false)
+  const [activeMeet, setActiveMeet] = useState<Meet | null>(null)
 
   useEffect(() => {
+    const meet = loadActiveMeet()
     const path = getActiveMeetResumePath()
     resumePathRef.current = path
-    setHasActiveMeet(Boolean(path))
+    setActiveMeet(meet)
     if (path) router.prefetch(path)
   }, [router])
 
-  const scrollToPanel = useCallback(
-    (index: number) => {
-      const i = Math.max(0, Math.min(TAB_COUNT - 1, index))
-      if (i === 2) {
-        const path = resumePathRef.current ?? getActiveMeetResumePath()
-        if (path) {
-          router.push(path)
-          return
-        }
-      }
-      setActiveIndex(i)
-      if (i === 0) {
-        searchInputRef.current?.focus()
-      }
-    },
-    [router],
-  )
+  const openActiveMeet = useCallback(() => {
+    const path = resumePathRef.current ?? getActiveMeetResumePath()
+    if (path) router.push(path)
+  }, [router])
+
+  const dismissActiveMeet = useCallback(() => {
+    closeActiveMeetLocally()
+    resumePathRef.current = null
+    setActiveMeet(null)
+  }, [])
+
+  const scrollToPanel = useCallback((index: number) => {
+    const i = Math.max(0, Math.min(TAB_COUNT - 1, index))
+    setActiveIndex(i)
+    if (i === 0) {
+      searchInputRef.current?.focus()
+    }
+  }, [])
 
   useEffect(() => {
     const commitDistanceFor = (width: number) =>
       Math.max(NAV_SWIPE_COMMIT_PX, width * NAV_SWIPE_COMMIT_RATIO)
 
-    const shouldResumeTacticsSwipe = (
-      start: NonNullable<typeof navSwipeStartRef.current>,
-      dx: number,
-    ) => {
-      const resumePath = resumePathRef.current
-      if (!resumePath || start.activeIndex !== 1 || dx >= 0) return false
-      return -dx >= commitDistanceFor(start.width)
-    }
-
     const dragOffsetFor = (start: NonNullable<typeof navSwipeStartRef.current>, dx: number) => {
-      const resumePath = resumePathRef.current
-      if (resumePath && start.activeIndex === 1 && dx < 0) {
-        const raw = Math.max(dx, -start.width)
-        return raw * 0.32
-      }
       const hasPrev = start.activeIndex > 0
       const hasNext = start.activeIndex < TAB_COUNT - 1
       const edgeDamped = (dx > 0 && !hasPrev) || (dx < 0 && !hasNext)
@@ -226,12 +263,6 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
       const ay = Math.abs(dy)
       if (!start.dragging && (ax < NAV_SWIPE_COMMIT_PX || ax < ay * 1.08)) {
         settleHomeTrack(start.activeIndex)
-        return
-      }
-
-      if (shouldResumeTacticsSwipe(start, dx)) {
-        settleHomeTrack(start.activeIndex)
-        router.push(resumePathRef.current!)
         return
       }
 
@@ -283,14 +314,6 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
         setHomeTrackTransform(start.activeIndex, 0, 'none')
       }
       if (e.cancelable) e.preventDefault()
-      if (start.dragging && shouldResumeTacticsSwipe(start, dx)) {
-        const resumePath = resumePathRef.current!
-        navSwipeStartRef.current = null
-        unlockHorizontalSwipeScroll()
-        settleHomeTrack(start.activeIndex)
-        router.push(resumePath)
-        return
-      }
       scheduleHomeDragFrame(start.activeIndex, dragOffsetFor(start, dx))
     }
 
@@ -318,7 +341,7 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
       window.removeEventListener('pointerup', onPointerUpCapture, true)
       window.removeEventListener('pointercancel', onPointerCancelCapture, true)
     }
-  }, [cancelNavRaf, router, scheduleHomeDragFrame, setHomeTrackTransform, settleHomeTrack])
+  }, [cancelNavRaf, scheduleHomeDragFrame, setHomeTrackTransform, settleHomeTrack])
 
   const navLabels = useMemo(
     () => [
@@ -441,7 +464,7 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
                         href={href}
                         onBeforeClientNavigate={() => {
                           try {
-                            sessionStorage.setItem('cs2-home-return-panel', 'search')
+                            sessionStorage.setItem(HOME_RETURN_PANEL_STORAGE_KEY, HOME_RETURN_PANEL_SEARCH)
                             sessionStorage.setItem('cs2-home-search-query', query)
                           } catch {
                             /* noop */
@@ -502,8 +525,26 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
         </section>
 
         <section className="flex h-full min-h-0 shrink-0 grow-0 flex-col" style={homePanelStyle} aria-hidden={activeIndex !== 2}>
-          {hasActiveMeet ? (
-            <div className="min-h-0 flex-1 bg-[#0d0d0d]" aria-hidden />
+          {activeMeet ? (
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-app-screen pb-[calc(8.1rem+env(safe-area-inset-bottom,0px))] pt-6">
+              <h2 className="mb-1 text-center text-lg font-bold">{t('home.tacticsTab.title')}</h2>
+              <p className="mb-5 max-w-sm text-center text-sm leading-relaxed text-[#888]">
+                {t('home.tacticsTab.hint')}
+              </p>
+              <HomeActiveMeetPreview
+                meet={activeMeet}
+                onOpen={openActiveMeet}
+                onClose={dismissActiveMeet}
+              />
+              <button
+                type="button"
+                data-home-global-swipe-ignore
+                onClick={() => router.push('/team?create=1')}
+                className="mt-4 flex h-12 w-full max-w-sm items-center justify-center rounded-xl border border-[#333] text-sm font-semibold text-[#ccc] transition-colors active:scale-[0.98] hover:border-[#444] hover:text-white"
+              >
+                {t('home.tacticsTab.createNewMeet')}
+              </button>
+            </div>
           ) : (
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-app-screen pb-[calc(8.1rem+env(safe-area-inset-bottom,0px))] pt-8 text-center">
               <span className="mb-3 text-4xl" aria-hidden>
@@ -516,6 +557,7 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
               <p className="mt-3 max-w-sm text-sm text-[#666]">{t('home.teamCta.description')}</p>
               <button
                 type="button"
+                data-home-global-swipe-ignore
                 onClick={() => router.push('/team?create=1')}
                 className="mt-6 flex h-14 w-full max-w-sm items-center justify-center rounded-xl bg-[#F0B429] text-base font-bold text-black"
               >
@@ -523,6 +565,7 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
               </button>
               <Link
                 href="/team"
+                data-home-global-swipe-ignore
                 className="mt-3 flex h-12 w-full max-w-sm items-center justify-center rounded-xl border border-[#333] text-sm font-semibold text-[#ccc]"
               >
                 {t('team.join')}
@@ -531,21 +574,18 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
           )}
         </section>
 
-        <section className="flex h-full min-h-0 shrink-0 grow-0 flex-col" style={homePanelStyle} aria-hidden={activeIndex !== 3}>
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-app-screen pb-[calc(8.1rem+env(safe-area-inset-bottom,0px))] pt-8 text-center">
-            <span className="mb-3 text-4xl" aria-hidden>
-              ✨
-            </span>
-            <h2 className="text-lg font-bold">{t('home.newsTab.title')}</h2>
-            <p className="mt-2 max-w-sm text-sm leading-relaxed text-[#888]">
-              {t('home.newsTab.hint')}
-            </p>
-          </div>
+        <section
+          className="flex h-full min-h-0 min-w-0 shrink-0 grow-0 flex-col overflow-hidden"
+          style={homePanelStyle}
+          aria-hidden={activeIndex !== 3}
+        >
+          <HomeNewsFeed items={lineupFeedItems} />
         </section>
         </div>
       </div>
 
       <nav
+        data-home-bottom-nav
         className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pt-1 sm:px-4"
         style={{
           paddingBottom: 'max(0.35rem, env(safe-area-inset-bottom, 0px))',
@@ -553,6 +593,7 @@ export default function HomeContent({ mapsWithCounts, grenadesByMap, positionCat
         aria-label={t('home.nav.ariaLabel')}
       >
         <div
+          data-home-global-swipe-ignore
           className="pointer-events-auto mx-auto inline-flex max-w-[min(calc(100vw-2.25rem),29rem)] shrink-0 gap-1 rounded-[1.14rem] border border-white/[0.08] bg-black/78 px-1.5 py-1 shadow-[0_10px_34px_rgba(0,0,0,0.52)] backdrop-blur-xl supports-[backdrop-filter]:bg-black/65"
           role="tablist"
         >
