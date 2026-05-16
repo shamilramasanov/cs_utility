@@ -373,7 +373,7 @@ const NewsFeedSlide = forwardRef<HTMLElement, SlideProps>(function NewsFeedSlide
 
         {paused && isActive ? (
           <span
-            className="pointer-events-none absolute left-1/2 top-1/2 z-20 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/65 pl-0.5 text-2xl text-white shadow-lg backdrop-blur-sm"
+            className="pointer-events-none absolute right-3 top-3 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/60 pl-0.5 text-xl text-white shadow-lg backdrop-blur-sm"
             aria-hidden
           >
             ▶
