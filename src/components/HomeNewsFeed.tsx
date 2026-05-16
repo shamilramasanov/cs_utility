@@ -330,32 +330,33 @@ const NewsFeedSlide = forwardRef<HTMLElement, SlideProps>(function NewsFeedSlide
         tabIndex={isActive ? 0 : -1}
         aria-pressed={paused}
         aria-label={paused ? t('home.newsTab.playVideo') : t('home.newsTab.pauseVideo')}
-        className={`relative h-full min-h-0 w-full touch-manipulation select-none outline-none [-webkit-tap-highlight-color:transparent] focus-visible:ring-2 focus-visible:ring-[#F0B429]/55 ${FEED_CARD}`}
+        className={`relative isolate h-full min-h-0 w-full overflow-hidden touch-manipulation select-none outline-none [-webkit-tap-highlight-color:transparent] focus-visible:ring-2 focus-visible:ring-[#F0B429]/55 ${FEED_CARD}`}
         onClick={onVideoClick}
         onPointerDown={onVideoPointerDown}
         onPointerUp={endPointerGesture}
         onPointerCancel={endPointerGesture}
         onPointerLeave={endPointerGesture}
       >
-        <div className="absolute inset-0 bg-[#0a0a0a]">
+        <div className="absolute inset-0 z-0 overflow-hidden bg-[#0a0a0a]">
           <video
             ref={videoRef}
             src={item.videoUrl}
-            className={`h-full w-full object-cover transition-opacity duration-500 ease-out ${
+            className={`pointer-events-none relative z-0 h-full w-full object-cover transition-opacity duration-500 ease-out ${
               isActive ? 'opacity-100' : 'opacity-40'
             }`}
             muted
             playsInline
+            disablePictureInPicture
             loop
             preload="metadata"
           />
         </div>
 
         <div
-          className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/80 via-black/45 to-transparent px-3 pb-10 pt-3"
+          className="pointer-events-none absolute inset-x-0 top-0 z-[5] bg-gradient-to-b from-black/85 via-black/55 to-transparent px-3 pb-10 pt-3 [transform:translate3d(0,0,1px)] [-webkit-transform:translate3d(0,0,1px)]"
           aria-hidden
         >
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-bold uppercase tracking-wide text-white">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-black/45 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white [transform:translate3d(0,0,2px)] [-webkit-transform:translate3d(0,0,2px)]">
             <span className="rounded-full px-2 py-0.5" style={{ backgroundColor: `${color}44`, color }}>
               {emoji} {typeLabel}
             </span>
