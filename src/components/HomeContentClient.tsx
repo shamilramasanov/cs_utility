@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import type { Grenade, MapData } from '@/types'
 import type { MapPosition } from '@/types/positions'
@@ -16,15 +16,17 @@ export interface HomeContentClientProps {
   grenadesByMap: Record<string, Grenade[]>
   positionCatalog: MapPosition[]
   lineupFeedItems: LineupFeedItem[]
+  /** Cloudflare Workers: данные с /api/home/bootstrap после mount */
+  bootstrapOnClient?: boolean
 }
 
-/**
- * next/dynamic с ssr: false допустим только в Client Component — иначе падает сборка.
- * Обход рассинхрона RSC/HTML и клиентского бандла в dev (Turbopack/HMR).
- */
 const HomeContent = dynamic(() => import('./HomeContent'), {
   ssr: false,
-  loading: () => (
+  loading: () => <HomeBootstrapSkeleton />,
+})
+
+function HomeBootstrapSkeleton() {
+  return (
     <div
       className="relative flex min-h-[50vh] flex-1 flex-col bg-[#0d0d0d]"
       aria-hidden
@@ -39,17 +41,56 @@ const HomeContent = dynamic(() => import('./HomeContent'), {
         </div>
       </div>
     </div>
-  ),
-})
+  )
+}
 
-export default function HomeContentClient(props: HomeContentClientProps) {
-  return (
-    <Suspense
-      fallback={
-        <div className="relative flex min-h-[50vh] flex-1 flex-col bg-[#0d0d0d]" aria-hidden />
+export default function HomeContentClient({
+  bootstrapOnClient = false,
+  ...initial
+}: HomeContentClientProps) {
+  const [data, setData] = useState<HomeContentClientProps | null>(
+    bootstrapOnClient ? null : { ...initial, bootstrapOnClient: false },
+  )
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    if (!bootstrapOnClient || data) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/home/bootstrap', { cache: 'no-store' })
+        if (!res.ok) throw new Error(String(res.status))
+        const json = (await res.json()) as Omit<HomeContentClientProps, 'bootstrapOnClient'>
+        if (!cancelled) {
+          setData({ ...json, bootstrapOnClient: false })
+          setFailed(false)
+        }
+      } catch {
+        if (!cancelled) setFailed(true)
       }
-    >
-      <HomeContent {...props} />
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [bootstrapOnClient, data])
+
+  if (bootstrapOnClient && !data) {
+    if (failed) {
+      return (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-app-screen py-12 text-center">
+          <p className="text-sm text-[#888]">Не удалось загрузить данные. Обновите страницу.</p>
+        </div>
+      )
+    }
+    return <HomeBootstrapSkeleton />
+  }
+
+  const payload = data ?? { ...initial, bootstrapOnClient: false }
+  const { bootstrapOnClient: _bootstrap, ...contentProps } = payload
+
+  return (
+    <Suspense fallback={<HomeBootstrapSkeleton />}>
+      <HomeContent {...contentProps} />
     </Suspense>
   )
 }

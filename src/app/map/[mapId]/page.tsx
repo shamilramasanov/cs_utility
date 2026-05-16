@@ -1,8 +1,8 @@
 import { getMap } from '@/lib/grenades'
-import { getMergedGrenadesForMapCached } from '@/lib/lineups'
+import { getMergedGrenadesForMap } from '@/lib/lineups'
 import { notFound } from 'next/navigation'
 import MapPageClientNoSSR from './MapPageClientNoSSR'
-import { getMergedPositionCatalogCached } from '@/lib/position-catalog-runtime'
+import { getMergedPositionCatalog } from '@/lib/position-catalog-runtime'
 import { mapPageQueryFromRecord } from '@/lib/map-page-initial-query'
 
 /** ISR: данные карты кэшируются через `unstable_cache` в lib (до 60 с). */
@@ -22,8 +22,8 @@ export default async function MapPage({ params, searchParams }: Props) {
   if (!map) notFound()
 
   const [initialGrenades, positionCatalog] = await Promise.all([
-    getMergedGrenadesForMapCached(mapId),
-    getMergedPositionCatalogCached(),
+    getMergedGrenadesForMap(mapId),
+    getMergedPositionCatalog(),
   ])
   const initialQuery = mapPageQueryFromRecord(sp)
   return (
