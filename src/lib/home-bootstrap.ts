@@ -42,31 +42,46 @@ function firstLayerGrenades(mapId: string, merged: Grenade[]): Grenade[] {
   return merged.filter((g) => !g.layer_file || g.layer_file === layer0)
 }
 
-export async function buildHomeBootstrapPayload() {
-  let lineupsFile: CustomLineupsFile
-  let extensionPositions: MapPosition[]
-
+async function loadEditorBootstrapData(): Promise<{
+  lineupsFile: CustomLineupsFile
+  extensionPositions: MapPosition[]
+}> {
   if (isEditorDatabaseEnabled()) {
     const rows = await editorDbGetManyJson([
       EDITOR_KEYS.custom_lineups,
       EDITOR_KEYS.position_catalog_extensions,
     ])
-    lineupsFile =
-      rows[EDITOR_KEYS.custom_lineups] != null
-        ? normalizeLineups(rows[EDITOR_KEYS.custom_lineups])
-        : readJsonFromRepo(LINEUPS_REL, { lineups: [], hidden_seed_ids: [] }, normalizeLineups)
-    extensionPositions =
-      rows[EDITOR_KEYS.position_catalog_extensions] != null
-        ? normalizeExtensions(rows[EDITOR_KEYS.position_catalog_extensions])
-        : readJsonFromRepo(EXT_REL, { positions: [] }, (r) => ({
-            positions: normalizeExtensions(r),
-          })).positions
-  } else {
-    lineupsFile = readJsonFromRepo(LINEUPS_REL, { lineups: [], hidden_seed_ids: [] }, normalizeLineups)
-    extensionPositions = readJsonFromRepo(EXT_REL, { positions: [] }, (r) => ({
-      positions: normalizeExtensions(r),
-    })).positions
+    return {
+      lineupsFile:
+        rows[EDITOR_KEYS.custom_lineups] != null
+          ? normalizeLineups(rows[EDITOR_KEYS.custom_lineups])
+          : readJsonFromRepo(LINEUPS_REL, { lineups: [], hidden_seed_ids: [] }, normalizeLineups),
+      extensionPositions:
+        rows[EDITOR_KEYS.position_catalog_extensions] != null
+          ? normalizeExtensions(rows[EDITOR_KEYS.position_catalog_extensions])
+          : readJsonFromRepo(EXT_REL, { positions: [] }, (r) => ({
+              positions: normalizeExtensions(r),
+            })).positions,
+    }
   }
+  return {
+    lineupsFile: readJsonFromRepo(LINEUPS_REL, { lineups: [], hidden_seed_ids: [] }, normalizeLineups),
+    extensionPositions: readJsonFromRepo(EXT_REL, { positions: [] }, (r) => ({
+      positions: normalizeExtensions(r),
+    })).positions,
+  }
+}
+
+export async function buildMapBootstrapPayload(mapId: string) {
+  const { lineupsFile, extensionPositions } = await loadEditorBootstrapData()
+  return {
+    initialGrenades: mergedGrenadesForMap(lineupsFile, mapId),
+    positionCatalog: mergePositionCatalog(STATIC_POSITIONS, extensionPositions),
+  }
+}
+
+export async function buildHomeBootstrapPayload() {
+  const { lineupsFile, extensionPositions } = await loadEditorBootstrapData()
 
   const maps = getMaps()
   const grenadesByMap: Record<string, Grenade[]> = {}
