@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import type { MapPosition } from '@/types/positions'
 import { EDITOR_KEYS, editorDbGetJson, editorDbSetJson, isEditorDatabaseEnabled } from '@/lib/editor-db'
+import { readJsonFromRepo } from '@/lib/safe-fs-json'
 
 const DATA_REL = 'src/data/position-catalog-extensions.json'
 
@@ -14,15 +15,7 @@ export interface PositionCatalogExtensionsFile {
 }
 
 function readFromDisk(): PositionCatalogExtensionsFile {
-  const p = getPath()
-  if (!fs.existsSync(p)) return { positions: [] }
-  try {
-    const raw = fs.readFileSync(p, 'utf8')
-    const data = JSON.parse(raw) as PositionCatalogExtensionsFile
-    return { positions: Array.isArray(data.positions) ? data.positions : [] }
-  } catch {
-    return { positions: [] }
-  }
+  return readJsonFromRepo(DATA_REL, { positions: [] }, normalize)
 }
 
 function writeToDisk(data: PositionCatalogExtensionsFile): void {

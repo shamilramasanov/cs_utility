@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import type { PositionZonesFile, PositionZone } from '@/types/positions'
 import { EDITOR_KEYS, editorDbGetJson, editorDbSetJson, isEditorDatabaseEnabled } from '@/lib/editor-db'
+import { readJsonFromRepo } from '@/lib/safe-fs-json'
 
 const DATA_REL = 'src/data/position-zones.json'
 
@@ -10,15 +11,7 @@ function getPath(): string {
 }
 
 function readFromDisk(): PositionZonesFile {
-  const p = getPath()
-  if (!fs.existsSync(p)) return { maps: {} }
-  try {
-    const raw = fs.readFileSync(p, 'utf8')
-    const data = JSON.parse(raw) as PositionZonesFile
-    return { maps: data.maps ?? {} }
-  } catch {
-    return { maps: {} }
-  }
+  return readJsonFromRepo(DATA_REL, { maps: {} }, normalize)
 }
 
 function writeToDisk(data: PositionZonesFile): void {

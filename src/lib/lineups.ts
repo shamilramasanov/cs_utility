@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { unstable_cache } from 'next/cache'
+import { readJsonFromRepo } from '@/lib/safe-fs-json'
 import type { CustomLineupsFile, Grenade } from '@/types'
 import grenadesData from '@/data/grenades.json'
 import { getMap } from '@/lib/grenades'
@@ -16,18 +17,9 @@ export function getCustomLineupsPath(): string {
 }
 
 function readCustomLineupsFromDisk(): CustomLineupsFile {
-  const p = getCustomLineupsPath()
-  if (!fs.existsSync(p)) return { lineups: [], hidden_seed_ids: [] }
-  try {
-    const raw = fs.readFileSync(p, 'utf8')
-    const d = JSON.parse(raw) as CustomLineupsFile
-    return {
-      lineups: Array.isArray(d.lineups) ? d.lineups : [],
-      hidden_seed_ids: Array.isArray(d.hidden_seed_ids) ? d.hidden_seed_ids : [],
-    }
-  } catch {
-    return { lineups: [], hidden_seed_ids: [] }
-  }
+  return readJsonFromRepo(DATA_REL, { lineups: [], hidden_seed_ids: [] }, (raw) =>
+    normalizeCustomLineupsFile(raw),
+  )
 }
 
 function writeCustomLineupsToDisk(data: CustomLineupsFile): void {

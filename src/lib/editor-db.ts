@@ -29,11 +29,22 @@ function connectionString(): string | null {
 
 let sqlSingleton: ReturnType<typeof postgres> | null = null
 
+function postgresOptions(): Parameters<typeof postgres>[1] {
+  // Workers: один коннект на изолят; Railway proxy — без prepared statements
+  return {
+    max: 1,
+    idle_timeout: 20,
+    connect_timeout: 12,
+    ssl: 'require',
+    prepare: false,
+  }
+}
+
 function getSql(): ReturnType<typeof postgres> | null {
   const url = connectionString()
   if (!url) return null
   if (!sqlSingleton) {
-    sqlSingleton = postgres(url, { max: 3, idle_timeout: 20, connect_timeout: 15 })
+    sqlSingleton = postgres(url, postgresOptions())
   }
   return sqlSingleton
 }
@@ -54,7 +65,8 @@ export async function editorDbGetJson(key: EditorContentKey): Promise<unknown | 
     return rows[0].payload
   } catch (e) {
     console.error('[editor-db] GET', key, e)
-    throw e
+    // Не роняем Worker (Cloudflare 1101) — страница откатится на диск/пустые данные
+    return null
   }
 }
 
