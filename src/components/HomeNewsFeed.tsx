@@ -190,7 +190,6 @@ export default function HomeNewsFeed({ items }: Props) {
       className="no-scrollbar h-full min-h-0 w-full flex-1 snap-y snap-mandatory overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
       style={{ scrollSnapType: 'y mandatory' }}
       onScroll={onScroll}
-      data-home-global-swipe-ignore
     >
       {items.map((item, index) => (
         <NewsFeedSlide

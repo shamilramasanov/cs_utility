@@ -12,7 +12,11 @@ export default function SiteHeader() {
   const showMapsLink = pathname.startsWith('/team') || pathname.startsWith('/map')
 
   return (
-    <header className="shrink-0 border-b border-[#222] bg-[#0d0d0d]" role="banner">
+    <header
+      className="shrink-0 border-b border-[#222] bg-[#0d0d0d]"
+      role="banner"
+      data-home-global-swipe-ignore
+    >
       <div className="px-app-screen pb-3 pt-app-header">
         <div className="flex min-w-0 items-center justify-between gap-3">
           <Link

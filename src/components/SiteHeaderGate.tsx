@@ -13,6 +13,7 @@ const SiteHeader = dynamic(() => import('./SiteHeader'), {
     <header
       className="shrink-0 border-b border-[#222] bg-[#0d0d0d]"
       role="banner"
+      data-home-global-swipe-ignore
       aria-busy="true"
       aria-hidden
     >
