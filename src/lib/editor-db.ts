@@ -57,6 +57,28 @@ export function isEditorDatabaseEnabled(): boolean {
   return Boolean(connectionString())
 }
 
+/** Все ключи одним запросом (для /api/home/bootstrap — один round-trip к Railway). */
+export const editorDbGetManyJson = cache(
+  async (keys: EditorContentKey[]): Promise<Partial<Record<EditorContentKey, unknown>>> => {
+    const sql = getSql()
+    if (!sql || keys.length === 0) return {}
+    try {
+      const rows = await sql<{ key: string; payload: unknown }[]>`
+        SELECT key, payload FROM editor_content WHERE key IN ${sql(keys)}
+      `
+      const out: Partial<Record<EditorContentKey, unknown>> = {}
+      for (const row of rows) {
+        const k = row.key as EditorContentKey
+        if (keys.includes(k)) out[k] = row.payload
+      }
+      return out
+    } catch (e) {
+      console.error('[editor-db] GET many', e)
+      return {}
+    }
+  },
+)
+
 /** `null` — строки нет (читаем с диска из репо). Кэш по ключу на один запрос. */
 export const editorDbGetJson = cache(async (key: EditorContentKey): Promise<unknown | null> => {
   const sql = getSql()

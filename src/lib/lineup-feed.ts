@@ -1,5 +1,6 @@
 import { customLineupToGrenade } from '@/lib/lineup-conversion'
 import { getMaps, getMap } from '@/lib/grenades'
+import type { CustomLineupsFile } from '@/types'
 import { getSeedGrenadesForMap, readCustomLineupsFile } from '@/lib/lineups'
 import { getPositionById } from '@/lib/positions'
 import { getThrowMethodLabel } from '@/lib/throw-labels'
@@ -95,11 +96,12 @@ function pushVideosFromGrenade(
 /** Все видео раскидок: сначала недавние из админки, затем сиды. */
 export async function buildLineupFeedItems(
   positionCatalog: MapPosition[],
+  customFilePreloaded?: CustomLineupsFile,
 ): Promise<LineupFeedItem[]> {
   const items: LineupFeedItem[] = []
   let order = 10_000
 
-  const customFile = await readCustomLineupsFile()
+  const customFile = customFilePreloaded ?? (await readCustomLineupsFile())
   for (let i = customFile.lineups.length - 1; i >= 0; i--) {
     const g = customLineupToGrenade(customFile.lineups[i])
     const mapName = getMap(g.map)?.display_name ?? g.map

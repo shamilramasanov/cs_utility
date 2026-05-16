@@ -39,6 +39,7 @@ function HomeBootstrapSkeleton() {
             <div key={i} className="aspect-square rounded-2xl bg-[#1a1a1a]" />
           ))}
         </div>
+        <p className="mt-4 text-center text-xs text-[#666]">Загрузка данных…</p>
       </div>
     </div>
   )
