@@ -5,9 +5,9 @@
   "scripts": {
     "dev": "next dev -H 0.0.0.0 --webpack",
     "dev:turbo": "next dev -H 0.0.0.0 --turbopack",
-    "build": "opennextjs-cloudflare build",
-    "build:next": "next build",
-    "preview": "opennextjs-cloudflare preview",
+    "build": "next build",
+    "build:cf": "opennextjs-cloudflare build",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare deploy",
     "start": "next start",
     "lint": "eslint",
