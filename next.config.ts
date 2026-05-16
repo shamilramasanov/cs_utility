@@ -2,8 +2,6 @@ import type { NextConfig } from 'next'
 import path from 'path'
 
 const nextConfig: NextConfig = {
-  /** Иначе драйвер может некорректно собираться в serverless-функции на Vercel. */
-  serverExternalPackages: ['postgres'],
   images: {
     remotePatterns: [
       {

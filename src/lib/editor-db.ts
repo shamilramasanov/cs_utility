@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer'
-import postgres from 'postgres'
+import { cache } from 'react'
+import type { Sql } from 'postgres'
 
 /** Ключи JSON-контента редактора (одна строка на ключ в `editor_content`). */
 export const EDITOR_KEYS = {
@@ -27,27 +28,32 @@ function connectionString(): string | null {
   return readEnv(envNameFromB64('REFUQUJBU0VfVVJM')) ?? readEnv(envNameFromB64('UE9TVEdSRVNfVVJM')) ?? null
 }
 
-let sqlSingleton: ReturnType<typeof postgres> | null = null
-
-function postgresOptions(): Parameters<typeof postgres>[1] {
-  // Workers: один коннект на изолят; Railway proxy — без prepared statements
+function postgresOptions() {
   return {
     max: 1,
-    idle_timeout: 20,
+    idle_timeout: 5,
     connect_timeout: 12,
-    ssl: 'require',
+    ssl: 'require' as const,
     prepare: false,
   }
 }
 
-function getSql(): ReturnType<typeof postgres> | null {
+/**
+ * Один клиент на HTTP-запрос (react cache), не глобальный singleton.
+ * Глобальный пул на Workers даёт 1101 / «I/O on behalf of a different request».
+ * @see https://opennext.js.org/cloudflare/howtos/db
+ */
+const getSql = cache(async (): Promise<Sql | null> => {
   const url = connectionString()
   if (!url) return null
-  if (!sqlSingleton) {
-    sqlSingleton = postgres(url, postgresOptions())
+  try {
+    const { default: postgres } = await import('postgres')
+    return postgres(url, postgresOptions())
+  } catch (e) {
+    console.error('[editor-db] init', e)
+    return null
   }
-  return sqlSingleton
-}
+})
 
 export function isEditorDatabaseEnabled(): boolean {
   return Boolean(connectionString())
@@ -55,7 +61,7 @@ export function isEditorDatabaseEnabled(): boolean {
 
 /** `null` — строки нет (читаем с диска из репо). */
 export async function editorDbGetJson(key: EditorContentKey): Promise<unknown | null> {
-  const sql = getSql()
+  const sql = await getSql()
   if (!sql) return null
   try {
     const rows = await sql<{ payload: unknown }[]>`
@@ -65,15 +71,14 @@ export async function editorDbGetJson(key: EditorContentKey): Promise<unknown | 
     return rows[0].payload
   } catch (e) {
     console.error('[editor-db] GET', key, e)
-    // Не роняем Worker (Cloudflare 1101) — страница откатится на диск/пустые данные
     return null
   }
 }
 
 export async function editorDbSetJson(key: EditorContentKey, payload: unknown): Promise<void> {
-  const sql = getSql()
+  const sql = await getSql()
   if (!sql) throw new Error('Задай DATABASE_PUBLIC_URL или DATABASE_URL / POSTGRES_URL')
-  const json = sql.json(payload as unknown as postgres.JSONValue)
+  const json = sql.json(payload as Parameters<Sql['json']>[0])
   await sql`
     INSERT INTO editor_content (key, payload, updated_at)
     VALUES (${key}, ${json}::jsonb, now())
