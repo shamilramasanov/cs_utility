@@ -2,6 +2,8 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "main": ".open-next/worker.js",
   "name": "csutility",
+  // Не затирать ADMIN_SECRET, DATABASE_PUBLIC_URL и др. из Dashboard при каждом деплое
+  "keep_vars": true,
   "compatibility_date": "2026-05-16",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "observability": {

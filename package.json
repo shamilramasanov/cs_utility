@@ -8,7 +8,7 @@
     "build": "next build",
     "build:cf": "opennextjs-cloudflare build",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "deploy": "opennextjs-cloudflare deploy",
+    "deploy": "opennextjs-cloudflare deploy -- --keep-vars",
     "start": "next start",
     "lint": "eslint",
     "build:favicon": "node scripts/build-favicon.mjs",
