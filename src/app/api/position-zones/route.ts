@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { POSITION_ZONES_CACHE_CONTROL } from '@/lib/api-cache-headers'
 import { getAllPositionsForMap } from '@/lib/positions'
 import { getMergedPositionCatalog } from '@/lib/position-catalog-runtime'
 import { getStoredZones } from '@/lib/position-zones-store'
@@ -12,11 +13,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'map and side are required' }, { status: 400 })
   }
 
-  const catalog = await getMergedPositionCatalog()
-  const positions = getAllPositionsForMap(mapId, catalog)
-  const stored = await getStoredZones(mapId, sideKey)
-  const zones = pickZones(stored, positions, sideKey)
+  try {
+    const catalog = await getMergedPositionCatalog()
+    const positions = getAllPositionsForMap(mapId, catalog)
+    const stored = await getStoredZones(mapId, sideKey)
+    const zones = pickZones(stored, positions, sideKey)
 
-  return NextResponse.json({ zones })
+    return NextResponse.json(
+      { zones },
+      { headers: { 'Cache-Control': POSITION_ZONES_CACHE_CONTROL } },
+    )
+  } catch (e) {
+    console.error('[api/position-zones]', mapId, sideKey, e)
+    return NextResponse.json({ error: 'zones failed' }, { status: 503 })
+  }
 }
 

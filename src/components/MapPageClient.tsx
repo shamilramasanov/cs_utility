@@ -152,9 +152,17 @@ interface Props {
   positionCatalog: MapPosition[]
   /** Снимок query с серверного `page` — до `useEffect` строим тот же `URLSearchParams`, что и на SSR. */
   initialQuery: MapPageInitialQuery
+  /** Зоны T/CT из map bootstrap — без отдельного /api/position-zones на первой загрузке. */
+  initialZonesBySide?: { t: PositionZone[]; ct: PositionZone[] }
 }
 
-function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQuery }: Props) {
+function MapPageClientInner({
+  mapId,
+  initialGrenades,
+  positionCatalog,
+  initialQuery,
+  initialZonesBySide,
+}: Props) {
   const t = useT()
   const lang = useLocale()
   const router = useRouter()
@@ -350,13 +358,21 @@ function MapPageClientInner({ mapId, initialGrenades, positionCatalog, initialQu
     setCenterColumnReady(true)
   }, [])
 
+  const initialZonesBySideRef = useRef(initialZonesBySide)
+  initialZonesBySideRef.current = initialZonesBySide
+
   useEffect(() => {
     const positions = positionsForPickerBaseRef.current
     const fallback = getDefaultZonesForPositions(positions)
+    const apiSide: SideKey = pickerTeam === 'any' ? 't' : pickerTeam
+    const preloaded = initialZonesBySideRef.current?.[apiSide]
+    if (preloaded && preloaded.length > 0) {
+      setZones(preloaded)
+      return
+    }
     setZones(fallback)
     const seq = ++zonesFetchSeqRef.current
     const ctrl = new AbortController()
-    const apiSide: SideKey = pickerTeam === 'any' ? 't' : pickerTeam
     fetch(`/api/position-zones?map=${mapId}&side=${apiSide}`, { signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((json) => {

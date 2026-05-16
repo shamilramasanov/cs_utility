@@ -2,6 +2,11 @@
 
 import { Suspense, useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
+import {
+  CLIENT_BOOTSTRAP_TTL_MS,
+  readClientBootstrapCache,
+  writeClientBootstrapCache,
+} from '@/lib/client-bootstrap-cache'
 import type { Grenade, MapData } from '@/types'
 import type { MapPosition } from '@/types/positions'
 import type { LineupFeedItem } from '@/lib/lineup-feed-types'
@@ -45,41 +50,50 @@ function HomeBootstrapSkeleton() {
   )
 }
 
+type HomeBootstrapPayload = Omit<HomeContentClientProps, 'bootstrapOnClient'>
+
 export default function HomeContentClient({
   bootstrapOnClient = false,
   ...initial
 }: HomeContentClientProps) {
-  const [data, setData] = useState<HomeContentClientProps | null>(
-    bootstrapOnClient ? null : { ...initial, bootstrapOnClient: false },
-  )
+  const [data, setData] = useState<HomeContentClientProps | null>(() => {
+    if (!bootstrapOnClient) return { ...initial, bootstrapOnClient: false }
+    const cached = readClientBootstrapCache<HomeBootstrapPayload>('home', CLIENT_BOOTSTRAP_TTL_MS)
+    return cached ? { ...cached, bootstrapOnClient: false } : null
+  })
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
-    if (!bootstrapOnClient || data) return
+    if (!bootstrapOnClient) return
     let cancelled = false
+    const hadCache = readClientBootstrapCache<HomeBootstrapPayload>('home', CLIENT_BOOTSTRAP_TTL_MS) != null
     ;(async () => {
       try {
-        const res = await fetch('/api/home/bootstrap', { cache: 'no-store' })
+        const res = await fetch('/api/home/bootstrap')
         if (!res.ok) throw new Error(String(res.status))
-        const json = (await res.json()) as Omit<HomeContentClientProps, 'bootstrapOnClient'>
+        const json = (await res.json()) as HomeBootstrapPayload
+        writeClientBootstrapCache('home', json)
         if (!cancelled) {
           setData({ ...json, bootstrapOnClient: false })
           setFailed(false)
         }
       } catch {
-        if (!cancelled) setFailed(true)
+        if (!cancelled && !hadCache) setFailed(true)
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [bootstrapOnClient, data])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- один fetch при mount / bootstrapOnClient
+  }, [bootstrapOnClient])
 
   if (bootstrapOnClient && !data) {
     if (failed) {
       return (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-app-screen py-12 text-center">
-          <p className="text-sm text-[#888]">Не удалось загрузить данные. Обновите страницу.</p>
+          <p className="text-sm text-[#888]">
+            Не удалось загрузить данные с сервера. Проверьте DATABASE_PUBLIC_URL в Cloudflare и обновите страницу.
+          </p>
         </div>
       )
     }

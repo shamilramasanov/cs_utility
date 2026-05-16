@@ -74,10 +74,23 @@ export const editorDbGetManyJson = cache(
       return out
     } catch (e) {
       console.error('[editor-db] GET many', e)
-      return {}
+      throw e
     }
   },
 )
+
+/** Проверка доступности Postgres (bootstrap routes). */
+export const editorDbPing = cache(async (): Promise<boolean> => {
+  const sql = getSql()
+  if (!sql) return false
+  try {
+    await sql`SELECT 1`
+    return true
+  } catch (e) {
+    console.error('[editor-db] ping', e)
+    return false
+  }
+})
 
 /** `null` — строки нет (читаем с диска из репо). Кэш по ключу на один запрос. */
 export const editorDbGetJson = cache(async (key: EditorContentKey): Promise<unknown | null> => {

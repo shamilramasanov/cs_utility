@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { cache } from 'react'
 import type { MapPosition } from '@/types/positions'
+import { getEditorContentBundle } from '@/lib/editor-content-bundle'
 import { EDITOR_KEYS, editorDbGetJson, editorDbSetJson, isEditorDatabaseEnabled } from '@/lib/editor-db'
 import { readJsonFromRepo } from '@/lib/safe-fs-json'
 
@@ -33,6 +34,10 @@ function normalize(raw: unknown): PositionCatalogExtensionsFile {
 
 export const readPositionCatalogExtensionsFile = cache(
   async (): Promise<PositionCatalogExtensionsFile> => {
+    const bundle = await getEditorContentBundle()
+    if (bundle?.[EDITOR_KEYS.position_catalog_extensions] != null) {
+      return normalize(bundle[EDITOR_KEYS.position_catalog_extensions])
+    }
     if (isEditorDatabaseEnabled()) {
       const row = await editorDbGetJson(EDITOR_KEYS.position_catalog_extensions)
       if (row != null) return normalize(row)
