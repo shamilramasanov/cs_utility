@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { mkdir, writeFile } from 'fs/promises'
-import path from 'path'
 import { randomUUID } from 'crypto'
 import { isAdminAuthorized } from '@/lib/admin-auth'
 import {
@@ -9,6 +7,7 @@ import {
   adminIsAllowedUploadMime,
   ADMIN_VIDEO_TYPES,
 } from '@/lib/admin-media-constants'
+import { saveGrenadeMediaFile } from '@/lib/admin-upload-storage'
 import { makeGrenadeStoredFilename } from '@/lib/admin-upload-names'
 
 export async function POST(req: NextRequest) {
@@ -36,12 +35,8 @@ export async function POST(req: NextRequest) {
     const buf = Buffer.from(await file.arrayBuffer())
     const originalName = file instanceof File ? file.name || '' : ''
     const name = makeGrenadeStoredFilename(originalName, mime, randomUUID().slice(0, 8))
-    const relDir = ['public', 'uploads', 'grenades']
-    const dir = path.join(process.cwd(), ...relDir)
-    await mkdir(dir, { recursive: true })
-    await writeFile(path.join(dir, name), buf)
+    const { url } = await saveGrenadeMediaFile(name, buf, mime)
 
-    const url = `/uploads/grenades/${name}`
     return NextResponse.json({ ok: true, url })
   } catch (e) {
     console.error(e)

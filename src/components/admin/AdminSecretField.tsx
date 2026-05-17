@@ -72,7 +72,7 @@ export default function AdminSecretField() {
         </div>
       ) : null}
       <label className="mb-1.5 block text-[11px] text-[#888]">
-        Ключ <code className="text-[#aaa]">ADMIN_SECRET</code> с сервера (тот же, что в Vercel / локальном{' '}
+        Ключ <code className="text-[#aaa]">ADMIN_SECRET</code> с сервера (тот же, что в Cloudflare / локальном{' '}
         <code className="text-[#aaa]">.env</code>) — введи сюда на <strong className="text-[#ccc]">этом сайте</strong>;
         в браузер он сам не подставляется. Хранится только в <code className="text-[#aaa]">sessionStorage</code>.
       </label>
@@ -93,7 +93,7 @@ export default function AdminSecretField() {
           }
         }}
         className="min-h-[48px] w-full rounded-xl border border-[#444] bg-[#222] px-3 py-3 text-base"
-        placeholder="Вставь ADMIN_SECRET (как в Vercel)"
+        placeholder="Вставь ADMIN_SECRET (как в Cloudflare)"
       />
     </div>
   )

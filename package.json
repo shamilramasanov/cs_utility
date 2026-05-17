@@ -16,14 +16,12 @@
     "db:schema:local": "wrangler d1 execute csutility-editor --local --file=scripts/sql/d1/001_editor_content.sql",
     "db:seed": "node scripts/d1-seed.mjs",
     "db:seed:local": "node scripts/d1-seed.mjs --local",
-    "db:migrate-from-pg": "node --env-file=.env scripts/migrate-pg-to-d1.mjs",
+    "db:fix-blob-urls": "node scripts/d1-rewrite-blob-urls.mjs",
     "seed:editor-db": "npm run db:seed"
   },
   "dependencies": {
     "@swc/helpers": "0.5.15",
-    "@vercel/blob": "^2.3.3",
     "next": "16.2.6",
-    "postgres": "^3.4.9",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },

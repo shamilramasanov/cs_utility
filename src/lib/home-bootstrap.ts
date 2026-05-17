@@ -8,6 +8,7 @@ import { customLineupToGrenade } from '@/lib/lineup-conversion'
 import { readJsonFromRepo } from '@/lib/safe-fs-json'
 import { mergePositionCatalog } from '@/lib/position-catalog-merge'
 import { getAllPositionsForMap } from '@/lib/positions'
+import { normalizeGrenadeMedia } from '@/lib/media-url'
 import { pickZones } from '@/lib/position-zones'
 import type { CustomLineupsFile, Grenade } from '@/types'
 import type { MapPosition, PositionZone, PositionZonesFile } from '@/types/positions'
@@ -43,7 +44,7 @@ function mergedGrenadesForMap(file: CustomLineupsFile, mapId: string): Grenade[]
   const base = (grenadesData.grenades as Grenade[]).filter(
     (g) => g.map === mapId && !hidden.has(g.id),
   )
-  return [...custom, ...base]
+  return [...custom, ...base].map(normalizeGrenadeMedia)
 }
 
 function firstLayerGrenades(mapId: string, merged: Grenade[]): Grenade[] {

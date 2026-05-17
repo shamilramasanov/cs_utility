@@ -1,4 +1,4 @@
-/** Лимиты и MIME — общие для `/api/admin/upload` и Vercel Blob client upload. */
+/** Лимиты и MIME для `/api/admin/upload`. */
 
 export const ADMIN_MAX_VIDEO_BYTES = 120 * 1024 * 1024
 export const ADMIN_MAX_IMAGE_BYTES = 25 * 1024 * 1024
@@ -18,11 +18,6 @@ export const ADMIN_EXT_BY_MIME: Record<string, string> = {
   'image/webp': '.webp',
   'image/gif': '.gif',
 }
-
-export const ADMIN_ALLOWED_BLOB_CONTENT_TYPES = [
-  ...ADMIN_VIDEO_MIMES,
-  ...ADMIN_IMAGE_MIMES,
-] as const
 
 export function adminMaxBytesForMime(mime: string): number {
   return ADMIN_VIDEO_TYPES.has(mime) ? ADMIN_MAX_VIDEO_BYTES : ADMIN_MAX_IMAGE_BYTES

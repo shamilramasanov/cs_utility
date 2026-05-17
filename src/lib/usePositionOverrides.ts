@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useSyncExternalStore } from 'react'
+import { normalizeMediaUrl } from '@/lib/media-url'
 import type { PositionOverride, PositionOverridesFile } from '@/types/positions'
 
 type Overrides = Record<string, PositionOverride>
@@ -73,7 +74,7 @@ export function usePositionOverrides() {
   const screenshotFor = useCallback(
     (positionId: string, fallback?: string): string | undefined => {
       const o = overrides[positionId]
-      return o?.screenshot_url ?? fallback
+      return normalizeMediaUrl(o?.screenshot_url) ?? normalizeMediaUrl(fallback) ?? fallback
     },
     [overrides],
   )

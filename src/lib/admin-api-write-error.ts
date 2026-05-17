@@ -1,4 +1,4 @@
-/** Ответ при ошибке записи JSON из админ-API (Vercel serverless — только чтение). */
+/** Ответ при ошибке записи JSON из админ-API (read-only FS на Workers). */
 function errnoCode(e: unknown): string {
   if (typeof e !== 'object' || e === null || !('code' in e)) return ''
   const c = (e as { code?: unknown }).code
@@ -16,7 +16,7 @@ export function jsonFromAdminWriteCatch(e: unknown): { error: string } {
   if (readOnlyFs) {
     return {
       error:
-        'Сохранение в JSON на этом хостинге недоступно (у Vercel файловая система деплоя только для чтения). Варианты: править через npm run dev локально и пушить изменения в Git; или перенести хранение в БД / Blob / VPS.',
+        'Сохранение в JSON на Workers недоступно (файловая система деплоя только для чтения). Контент редактора хранится в D1; медиа — в R2 или public/uploads + git.',
     }
   }
   return { error: msg || 'Invalid body' }

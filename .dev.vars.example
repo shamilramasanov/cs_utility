@@ -2,4 +2,5 @@
 NEXTJS_ENV=development
 ADMIN_SECRET=
 
-# D1 настраивается в wrangler.jsonc (binding DB). Postgres/Railway больше не нужен на Workers.
+# D1 — wrangler.jsonc (DB). Медиа — R2 bucket csutility-media (MEDIA).
+# Vercel Blob не используется. После деплоя: npm run db:fix-blob-urls

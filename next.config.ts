@@ -2,15 +2,6 @@ import type { NextConfig } from 'next'
 import path from 'path'
 
 const nextConfig: NextConfig = {
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '*.public.blob.vercel-storage.com',
-        pathname: '/**',
-      },
-    ],
-  },
   /**
    * Dev-сервер Next блокирует загрузку dev-ресурсов (HMR и т.п.) с “чужих” origin’ов.
    * На iOS при открытии по IP это проявляется как “кнопки жмутся, но ничего не происходит”,

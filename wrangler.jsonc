@@ -28,5 +28,11 @@
       "database_name": "csutility-editor",
       "database_id": "37b6e1b4-c273-40a0-a3ed-bffe9095aa0a"
     }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "csutility-media"
+    }
   ]
 }

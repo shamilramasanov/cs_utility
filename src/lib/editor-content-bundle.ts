@@ -6,7 +6,7 @@ import {
   isEditorDatabaseEnabled,
 } from '@/lib/editor-db'
 
-/** Все ключи редактора одним SELECT (один round-trip к Postgres на HTTP-запрос). */
+/** Все ключи редактора одним SELECT (один round-trip к D1 на HTTP-запрос). */
 export const EDITOR_BOOTSTRAP_KEYS = [
   EDITOR_KEYS.custom_lineups,
   EDITOR_KEYS.position_catalog_extensions,
